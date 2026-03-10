@@ -2,3 +2,5 @@ build/
 odin/
 .DS_Store
 waiig_code_1.3
+debug_build*
+*.bin
