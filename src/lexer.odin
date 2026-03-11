@@ -17,7 +17,7 @@ lexer_init :: proc(input: string, allocator := context.allocator) -> ^Lexer {
 	return l
 }
 
-next_token :: proc(l: ^Lexer) -> Token {
+lexer_next_token :: proc(l: ^Lexer) -> Token {
 	tok: Token
 
 	skip_whitespace(l)

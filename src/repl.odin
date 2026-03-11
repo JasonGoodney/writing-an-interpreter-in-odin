@@ -20,7 +20,7 @@ repl_start :: proc(_in: io.Reader, _out: io.Writer) {
 		line := bufio.scanner_text(scanner)
 
 		lexer := lexer_init(line)
-		for tok := next_token(lexer); tok.type != .EOF; tok = next_token(lexer) {
+		for tok := lexer_next_token(lexer); tok.type != .EOF; tok = lexer_next_token(lexer) {
 			s := fmt.tprintf("%v\n", tok)
 			io.write_string(_out, s)
 		}

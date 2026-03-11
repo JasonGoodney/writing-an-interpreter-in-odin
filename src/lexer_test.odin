@@ -108,7 +108,7 @@ test_next_token :: proc(t: ^testing.T) {
 	lex := lexer_init(input, context.allocator)
 
 	for test, i in tests {
-		tok := next_token(lex)
+		tok := lexer_next_token(lex)
 		testing.expectf(
 			t,
 			tok.type == test.expected_type,
