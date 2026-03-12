@@ -123,19 +123,25 @@ parse_stmt :: proc(p: ^Parser) -> Statement {
 }
 
 parse_let_stmt :: proc(p: ^Parser) -> Let_Statement {
-	stmt := Let_Statement{}
+	stmt := Let_Statement {
+		token = p.cur_tok,
+	}
 
 	if !expect_peek(p, .IDENT) {
 		return {}
 	}
 
-	stmt.name = Identifier{}
-	stmt.name.token = p.cur_tok
-	stmt.name.value = p.cur_tok.literal
+	stmt.name = Identifier {
+		token = p.cur_tok,
+		value = p.cur_tok.literal,
+	}
 
 	if !expect_peek(p, .ASSIGN) {
 		return {}
 	}
+
+	parse_next_token(p)
+	stmt.value = parse_expression(p, .LOWEST)
 
 	for p.cur_tok.type != .SEMICOLON {
 		parse_next_token(p)
@@ -148,6 +154,8 @@ parse_return_stmt :: proc(p: ^Parser) -> Return_Statement {
 	stmt := Return_Statement{}
 	stmt.token = p.cur_tok
 	parse_next_token(p)
+
+	stmt.return_value = parse_expression(p, .LOWEST)
 
 	for p.cur_tok.type != .SEMICOLON {
 		parse_next_token(p)
