@@ -76,6 +76,7 @@ parser_init :: proc(l: ^Lexer, allocator := context.allocator) -> ^Parser {
 	register_prefix(p, .MINUS, parse_prefix_expression)
 	register_prefix(p, .TRUE, parse_boolean)
 	register_prefix(p, .FALSE, parse_boolean)
+	register_prefix(p, .LPAREN, parse_grouped_expression)
 
 	p.infix_parse_fns = make(type_of(p.infix_parse_fns), allocator)
 	register_infix(p, .PLUS, parse_infix_expression)
@@ -252,6 +253,18 @@ parse_infix_expression :: proc(p: ^Parser, left: ^Expression) -> Expression {
 	expr.right = new_clone(parse_expression(p, prec), p.allocator)
 
 	return Expression{expr}
+}
+
+parse_grouped_expression :: proc(p: ^Parser) -> Expression {
+	parse_next_token(p)
+
+	expr := parse_expression(p, .LOWEST)
+
+	if !expect_peek(p, .RPAREN) {
+		return {}
+	}
+
+	return expr
 }
 
 expect_peek :: proc(p: ^Parser, type: Token_Type) -> bool {
