@@ -74,6 +74,8 @@ parser_init :: proc(l: ^Lexer, allocator := context.allocator) -> ^Parser {
 	register_prefix(p, .INT, parse_integer_literal)
 	register_prefix(p, .BANG, parse_prefix_expression)
 	register_prefix(p, .MINUS, parse_prefix_expression)
+	register_prefix(p, .TRUE, parse_boolean)
+	register_prefix(p, .FALSE, parse_boolean)
 
 	p.infix_parse_fns = make(type_of(p.infix_parse_fns), allocator)
 	register_infix(p, .PLUS, parse_infix_expression)
@@ -217,6 +219,17 @@ parse_integer_literal :: proc(p: ^Parser) -> Expression {
 		return {}
 	}
 	expr := Integer_Literal{p.cur_tok, value}
+	return Expression{expr}
+}
+
+parse_boolean :: proc(p: ^Parser) -> Expression {
+	value, ok := strconv.parse_bool(p.cur_tok.literal)
+	if !ok {
+		msg := fmt.tprintf("Boolean not bool: %s", p.cur_tok.literal)
+		append(&p.errors, msg)
+		return {}
+	}
+	expr := Boolean{p.cur_tok, value}
 	return Expression{expr}
 }
 

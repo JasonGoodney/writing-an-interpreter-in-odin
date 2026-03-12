@@ -23,6 +23,7 @@ to_string :: proc {
 	integer_literal_to_string,
 	prefix_expression_to_string,
 	infix_expression_to_string,
+	boolean_to_string,
 }
 
 Program :: struct {
@@ -103,6 +104,7 @@ Expression :: struct {
 		Integer_Literal,
 		Prefix_Expression,
 		Infix_Expression,
+		Boolean,
 	},
 }
 expression_to_string :: proc(expr: ^Expression) -> string {
@@ -114,6 +116,8 @@ expression_to_string :: proc(expr: ^Expression) -> string {
 	case Prefix_Expression:
 		return to_string(&v)
 	case Infix_Expression:
+		return to_string(&v)
+	case Boolean:
 		return to_string(&v)
 	case:
 		return "Unknown Expression"
@@ -153,5 +157,13 @@ Infix_Expression :: struct {
 }
 infix_expression_to_string :: proc(expr: ^Infix_Expression) -> string {
 	return fmt.tprintf("(%s %s %s)", to_string(expr.left), expr.op, to_string(expr.right))
+}
+
+Boolean :: struct {
+	token: Token,
+	value: bool,
+}
+boolean_to_string :: proc(expr: ^Boolean) -> string {
+	return expr.token.literal
 }
 

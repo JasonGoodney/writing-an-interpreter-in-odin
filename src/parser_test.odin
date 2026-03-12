@@ -6,6 +6,7 @@ import "core:testing"
 Expected_Value :: union {
 	i64,
 	string,
+	bool,
 }
 
 @(test)
@@ -156,6 +157,40 @@ test_integer_literal :: proc(t: ^testing.T) {
 		expr.token.literal,
 	)
 }
+@(test)
+test_boolean :: proc(t: ^testing.T) {
+	alloc := context.temp_allocator
+
+	input := "true;"
+	l := lexer_init(input, alloc)
+	p := parser_init(l, alloc)
+	prog := parse_program(p)
+	_check_parse_errors(t, p)
+
+	testing.expectf(
+		t,
+		len(prog.statements) == 1,
+		"program has not enough statements, got=`%d`",
+		len(prog.statements),
+	)
+	stmt, ok := prog.statements[0].variant.(Expression_Statement)
+	testing.expectf(
+		t,
+		ok,
+		"prog.statements[0] is not Expression_Statement. got=`%T`",
+		prog.statements[0].variant,
+	)
+	expr, expr_ok := stmt.expr.variant.(Boolean)
+	testing.expectf(t, expr_ok, "expr not Boolean. got=`%T`", stmt.expr.variant)
+	testing.expectf(t, expr.value == true, "expr.value expected=`%d`. got=`%d`", true, expr.value)
+	testing.expectf(
+		t,
+		expr.token.literal == "true",
+		"expr.token.literal not %s. got=`%s`",
+		"true",
+		expr.token.literal,
+	)
+}
 
 @(test)
 test_prefix_expressions :: proc(t: ^testing.T) {
@@ -168,8 +203,8 @@ test_prefix_expressions :: proc(t: ^testing.T) {
 		{"-15;", "-", 15},
 		{"!foobar;", "!", "foobar"},
 		{"-foobar;", "-", "foobar"},
-		// {"!true;", "!", true},
-		// {"!false;", "!", false},
+		{"!true;", "!", true},
+		{"!false;", "!", false},
 	}
 
 	for tt in tests {
@@ -227,9 +262,9 @@ test_infix_expressions :: proc(t: ^testing.T) {
 		{"foobar < barfoo;", "foobar", "<", "barfoo"},
 		{"foobar == barfoo;", "foobar", "==", "barfoo"},
 		{"foobar != barfoo;", "foobar", "!=", "barfoo"},
-		// {"true == true", true, "==", true},
-		// {"true != false", true, "!=", false},
-		// {"false == false", false, "==", false},
+		{"true == true", true, "==", true},
+		{"true != false", true, "!=", false},
+		{"false == false", false, "==", false},
 	}
 
 	for tt in tests {
@@ -279,6 +314,10 @@ test_operator_precedence_parsing :: proc(t: ^testing.T) {
 		{"5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"},
 		{"3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"},
 		{"3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"},
+		{"true", "true"},
+		{"false", "false"},
+		{"3 > 5 == false", "((3 > 5) == false)"},
+		{"3 < 5 == true", "((3 < 5) == true)"},
 	}
 
 	for tt in tests {
@@ -331,10 +370,32 @@ _test_literal_expression :: proc(t: ^testing.T, expr: Expression, expected: $T) 
 		return _test_integer_literal(t, expr, ev)
 	case string:
 		return _test_identifier(t, expr, ev)
+	case bool:
+		return _test_boolean(t, expr, ev)
 	}
 
 	fmt.printfln("type of expr not handled. got=`%T`", expected)
 	return false
+}
+
+_test_boolean :: proc(t: ^testing.T, expr: Expression, value: bool) -> bool {
+	b, ok := expr.variant.(Boolean)
+	testing.expectf(t, ok, "expr not Boolean. got=%T", expr.variant)
+	if !ok {return false}
+
+	testing.expectf(t, b.value == value, "b.value not %t. got=%t", value, b.value)
+	if b.value != value {return false}
+
+	testing.expectf(
+		t,
+		b.token.literal == fmt.tprintf("%t", value),
+		"b.token.literal not %t. got=%s",
+		value,
+		b.token.literal,
+	)
+	if b.token.literal != fmt.tprintf("%t", value) {return false}
+
+	return true
 }
 
 _test_integer_literal :: proc(
@@ -427,3 +488,4 @@ _check_parse_errors :: proc(t: ^testing.T, p: ^Parser) {
 
 	testing.fail_now(t)
 }
+
