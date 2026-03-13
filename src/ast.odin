@@ -17,6 +17,7 @@ to_string :: proc {
 	let_statement_to_string,
 	return_statement_to_string,
 	expression_statement_to_string,
+	block_statement_to_string,
 	// expressions
 	expression_to_string,
 	identifier_to_string,
@@ -24,6 +25,7 @@ to_string :: proc {
 	prefix_expression_to_string,
 	infix_expression_to_string,
 	boolean_to_string,
+	if_expression_to_string,
 }
 
 Program :: struct {
@@ -50,6 +52,7 @@ Statement :: struct {
 		Let_Statement,
 		Return_Statement,
 		Expression_Statement,
+		Block_Statement,
 	},
 }
 statement_to_string :: proc(stmt: ^Statement) -> string {
@@ -59,6 +62,8 @@ statement_to_string :: proc(stmt: ^Statement) -> string {
 	case Return_Statement:
 		return to_string(&v)
 	case Expression_Statement:
+		return to_string(&v)
+	case Block_Statement:
 		return to_string(&v)
 	case:
 		return "Unknown Statement"
@@ -97,6 +102,23 @@ expression_statement_to_string :: proc(stmt: ^Expression_Statement) -> string {
 	return to_string(&stmt.expr)
 }
 
+Block_Statement :: struct {
+	token:      Token,
+	statements: [dynamic]Statement,
+}
+block_statement_to_string :: proc(stmt: ^Block_Statement) -> string {
+	buf: [dynamic]byte
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+	for &s in stmt.statements {
+		str := to_string(&s)
+		strings.write_string(&sb, str)
+	}
+
+	str := strings.clone(strings.to_string(sb))
+	return str
+}
+
 // Expression
 Expression :: struct {
 	variant: union {
@@ -105,6 +127,7 @@ Expression :: struct {
 		Prefix_Expression,
 		Infix_Expression,
 		Boolean,
+		If_Expression,
 	},
 }
 expression_to_string :: proc(expr: ^Expression) -> string {
@@ -118,6 +141,8 @@ expression_to_string :: proc(expr: ^Expression) -> string {
 	case Infix_Expression:
 		return to_string(&v)
 	case Boolean:
+		return to_string(&v)
+	case If_Expression:
 		return to_string(&v)
 	case:
 		return "Unknown Expression"
@@ -165,5 +190,28 @@ Boolean :: struct {
 }
 boolean_to_string :: proc(expr: ^Boolean) -> string {
 	return expr.token.literal
+}
+
+If_Expression :: struct {
+	token:       Token,
+	condition:   ^Expression,
+	consequence: ^Block_Statement,
+	alternative: ^Block_Statement,
+}
+if_expression_to_string :: proc(expr: ^If_Expression) -> string {
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+
+	strings.write_string(&sb, "if")
+	strings.write_string(&sb, to_string(expr.condition))
+	strings.write_string(&sb, " ")
+	strings.write_string(&sb, to_string(expr.consequence))
+
+	if expr.alternative != nil {
+		strings.write_string(&sb, "else ")
+		strings.write_string(&sb, to_string(expr.alternative))
+	}
+
+	return strings.clone(strings.to_string(sb))
 }
 

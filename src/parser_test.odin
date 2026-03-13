@@ -345,6 +345,131 @@ test_operator_precedence_parsing :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_if_expression :: proc(t: ^testing.T) {
+	input := `if (x < y) { x }`
+
+	alloc := context.temp_allocator
+	free_all(alloc)
+	l := lexer_init(input, alloc)
+	p := parser_init(l, alloc)
+	prog := parse_program(p)
+	_check_parse_errors(t, p)
+
+
+	testing.expectf(
+		t,
+		len(prog.statements) == 1,
+		"program has not enough statements, got=`%d`",
+		len(prog.statements),
+	)
+	stmt, ok := prog.statements[0].variant.(Expression_Statement)
+	testing.expectf(
+		t,
+		ok,
+		"prog.statements[0] is not Expression_Statement. got=`%T`",
+		prog.statements[0].variant,
+	)
+
+	ifexpr, if_ok := stmt.expr.variant.(If_Expression)
+	testing.expectf(t, ok, "stmt.expr is not If_Expression. got=%T", stmt.expr.variant)
+
+	if !_test_infix_expression(t, ifexpr.condition^, "x", "<", "y") {
+		return
+	}
+
+	testing.expectf(
+		t,
+		len(ifexpr.consequence.statements) == 1,
+		"consequence is not 1 statements. got=%d",
+		len(ifexpr.consequence.statements),
+	)
+
+	conseq, conseq_ok := ifexpr.consequence.statements[0].variant.(Expression_Statement)
+	testing.expectf(
+		t,
+		ok,
+		"statements[0] not Expression_Statement. got=%T",
+		ifexpr.consequence.statements[0].variant,
+	)
+
+	if !_test_identifier(t, conseq.expr, "x") {
+		return
+	}
+
+	testing.expectf(
+		t,
+		ifexpr.alternative == nil,
+		"alternative not nil. got=%v",
+		ifexpr.alternative,
+	)
+}
+
+@(test)
+test_if_else_expression :: proc(t: ^testing.T) {
+	input := `if (x < y) { x } else { y }`
+
+	alloc := context.temp_allocator
+	free_all(alloc)
+	l := lexer_init(input, alloc)
+	p := parser_init(l, alloc)
+	prog := parse_program(p)
+	_check_parse_errors(t, p)
+
+
+	testing.expectf(
+		t,
+		len(prog.statements) == 1,
+		"program has not enough statements, got=`%d`",
+		len(prog.statements),
+	)
+	stmt, ok := prog.statements[0].variant.(Expression_Statement)
+	testing.expectf(
+		t,
+		ok,
+		"prog.statements[0] is not Expression_Statement. got=`%T`",
+		prog.statements[0].variant,
+	)
+
+	ifexpr, if_ok := stmt.expr.variant.(If_Expression)
+	testing.expectf(t, ok, "stmt.expr is not If_Expression. got=%T", stmt.expr.variant)
+
+	if !_test_infix_expression(t, ifexpr.condition^, "x", "<", "y") {
+		return
+	}
+
+	testing.expectf(
+		t,
+		len(ifexpr.consequence.statements) == 1,
+		"consequence is not 1 statements. got=%d",
+		len(ifexpr.consequence.statements),
+	)
+
+	conseq, conseq_ok := ifexpr.consequence.statements[0].variant.(Expression_Statement)
+	testing.expectf(
+		t,
+		ok,
+		"consequence.statements[0] not Expression_Statement. got=%T",
+		ifexpr.consequence.statements[0].variant,
+	)
+
+	if !_test_identifier(t, conseq.expr, "x") {
+		return
+	}
+
+	alt, alt_ok := ifexpr.alternative.statements[0].variant.(Expression_Statement)
+	testing.expectf(
+		t,
+		ok,
+		"alt.statements[0] not Expression_Statement. got=%T",
+		ifexpr.alternative.statements[0].variant,
+	)
+
+	if !_test_identifier(t, alt.expr, "y") {
+		return
+	}
+}
+
 //
 // ========= Helpers ==========================
 //
@@ -376,7 +501,11 @@ _test_let_statement :: proc(t: ^testing.T, s: Statement, name: string) -> bool {
 	return true
 }
 
-_test_literal_expression :: proc(t: ^testing.T, expr: Expression, expected: $T) -> bool {
+_test_literal_expression :: proc(
+	t: ^testing.T,
+	expr: Expression,
+	expected: Expected_Value,
+) -> bool {
 	switch ev in expected {
 	case i64:
 		return _test_integer_literal(t, expr, ev)

@@ -77,6 +77,7 @@ parser_init :: proc(l: ^Lexer, allocator := context.allocator) -> ^Parser {
 	register_prefix(p, .TRUE, parse_boolean)
 	register_prefix(p, .FALSE, parse_boolean)
 	register_prefix(p, .LPAREN, parse_grouped_expression)
+	register_prefix(p, .IF, parse_if_expression)
 
 	p.infix_parse_fns = make(type_of(p.infix_parse_fns), allocator)
 	register_infix(p, .PLUS, parse_infix_expression)
@@ -100,9 +101,17 @@ parse_program :: proc(p: ^Parser) -> ^Program {
 
 	for p.cur_tok.type != .EOF {
 		stmt := parse_stmt(p)
-		if stmt != {} {
+		switch &v in stmt.variant {
+		case Let_Statement:
+			append(&prog.statements, stmt)
+		case Return_Statement:
+			append(&prog.statements, stmt)
+		case Expression_Statement:
+			append(&prog.statements, stmt)
+		case Block_Statement:
 			append(&prog.statements, stmt)
 		}
+
 		parse_next_token(p)
 	}
 
@@ -177,6 +186,31 @@ parse_expression_stmt :: proc(p: ^Parser) -> Expression_Statement {
 	}
 
 	return stmt
+}
+
+parse_block_statement :: proc(p: ^Parser) -> Block_Statement {
+	block := Block_Statement {
+		token = p.cur_tok,
+	}
+	block.statements = make(type_of(block.statements), p.allocator)
+
+	parse_next_token(p)
+
+	for p.cur_tok.type != .RBRACE && p.cur_tok.type != .EOF {
+		stmt := parse_stmt(p)
+		switch &v in stmt.variant {
+		case Let_Statement:
+			append(&block.statements, stmt)
+		case Return_Statement:
+			append(&block.statements, stmt)
+		case Expression_Statement:
+			append(&block.statements, stmt)
+		case Block_Statement:
+			append(&block.statements, stmt)
+		}
+		parse_next_token(p)
+	}
+	return block
 }
 
 // Expressions
@@ -265,6 +299,37 @@ parse_grouped_expression :: proc(p: ^Parser) -> Expression {
 	}
 
 	return expr
+}
+
+parse_if_expression :: proc(p: ^Parser) -> Expression {
+	expr := If_Expression {
+		token = p.cur_tok,
+	}
+	if !expect_peek(p, .LPAREN) {
+		return {}
+	}
+
+	parse_next_token(p)
+	expr.condition = new_clone(parse_expression(p, .LOWEST), p.allocator)
+	if !expect_peek(p, .RPAREN) {
+		return {}
+	}
+
+	if !expect_peek(p, .LBRACE) {
+		return {}
+	}
+
+	expr.consequence = new_clone(parse_block_statement(p), p.allocator)
+
+	if p.peek_tok.type == .ELSE {
+		parse_next_token(p)
+		if !expect_peek(p, .LBRACE) {
+			return {}
+		}
+		expr.alternative = new_clone(parse_block_statement(p), p.allocator)
+	}
+
+	return Expression{expr}
 }
 
 expect_peek :: proc(p: ^Parser, type: Token_Type) -> bool {
