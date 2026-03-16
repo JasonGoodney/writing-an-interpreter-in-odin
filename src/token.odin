@@ -47,16 +47,12 @@ Token_Type :: enum {
 token_string_table := [Token_Type]string {
 	.ILLEGAL   = "ILLEGAL",
 	.EOF       = "EOF",
+
+	// Identifiers + literals
 	.IDENT     = "IDENT",
 	.INT       = "INT",
-	.COMMA     = "COMMA",
-	.SEMICOLON = "SEMICOLON",
-	.LBRACE    = "{",
-	.RBRACE    = "}",
-	.LPAREN    = "(",
-	.RPAREN    = ")",
-	.LET       = "LET",
-	.FUNCTION  = "FUNCTION",
+
+	// Operators
 	.ASSIGN    = "=",
 	.PLUS      = "+",
 	.MINUS     = "-",
@@ -67,6 +63,18 @@ token_string_table := [Token_Type]string {
 	.GT        = ">",
 	.EQ        = "==",
 	.NOT_EQ    = "!=",
+
+	// Delimiters
+	.COMMA     = ",",
+	.SEMICOLON = ";",
+	.LBRACE    = "{",
+	.RBRACE    = "}",
+	.LPAREN    = "(",
+	.RPAREN    = ")",
+
+	// Keywords
+	.LET       = "LET",
+	.FUNCTION  = "FN",
 	.TRUE      = "TRUE",
 	.FALSE     = "FALSE",
 	.IF        = "IF",

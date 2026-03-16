@@ -158,7 +158,7 @@ parse_let_stmt :: proc(p: ^Parser) -> Let_Statement {
 	parse_next_token(p)
 	stmt.value = parse_expression(p, .LOWEST)
 
-	for p.cur_tok.type != .SEMICOLON {
+	for p.peek_tok.type == .SEMICOLON {
 		parse_next_token(p)
 	}
 
@@ -172,7 +172,7 @@ parse_return_stmt :: proc(p: ^Parser) -> Return_Statement {
 
 	stmt.return_value = parse_expression(p, .LOWEST)
 
-	for p.cur_tok.type != .SEMICOLON {
+	for p.peek_tok.type == .SEMICOLON {
 		parse_next_token(p)
 	}
 
@@ -428,6 +428,11 @@ expect_peek :: proc(p: ^Parser, type: Token_Type) -> bool {
 }
 
 peek_error :: proc(p: ^Parser, type: Token_Type) {
-	msg := fmt.tprintf("expected next to be `%s`, got `%s` instead", type, p.peek_tok.type)
+	msg := fmt.tprintf(
+		"expected next to be `%s`, got `%s` instead",
+		token_string_table[type],
+		p.peek_tok.type,
+	)
 	append(&p.errors, msg)
 }
+

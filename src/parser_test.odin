@@ -16,7 +16,7 @@ test_let_statements :: proc(t: ^testing.T) {
 		input:          string,
 		expected_ident: string,
 		expected_value: Expected_Value,
-	}{{"let x = 5;", "x", 5}, {"let foobar = y;", "foobar", "y"}}
+	}{{"let x = 5;", "x", 5}, {"let y = true;", "y", true}, {"let foobar = y;", "foobar", "y"}}
 
 	for tt, i in tests {
 		alloc := context.temp_allocator
@@ -49,11 +49,7 @@ test_return_statements :: proc(t: ^testing.T) {
 	tests := []struct {
 		input:         string,
 		expectedValue: Expected_Value,
-	} {
-		{"return 5;", 5},
-		// {"return true;", true},
-		{"return foobar;", "foobar"},
-	}
+	}{{"return 5;", 5}, {"return true;", true}, {"return foobar;", "foobar"}}
 
 	for tt in tests {
 		alloc := context.temp_allocator
@@ -640,7 +636,7 @@ test_call_expression_parameter_parsing :: proc(t: ^testing.T) {
 
 		testing.expectf(
 			t,
-			len(expr.arguments) == 3,
+			len(expr.arguments) == len(tt.expectedArgs),
 			"wrong argument count. got=%d",
 			len(expr.arguments),
 		)
@@ -812,3 +808,4 @@ _check_parse_errors :: proc(t: ^testing.T, p: ^Parser) {
 
 	testing.fail_now(t)
 }
+
