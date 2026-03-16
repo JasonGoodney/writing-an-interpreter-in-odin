@@ -28,6 +28,7 @@ to_string :: proc {
 	boolean_to_string,
 	if_expression_to_string,
 	function_literal_to_string,
+	call_expression_to_string,
 }
 
 Program :: struct {
@@ -129,6 +130,7 @@ Expression :: struct {
 		Boolean,
 		If_Expression,
 		Function_Literal,
+		Call_Expression,
 	},
 }
 expression_to_string :: proc(expr: ^Expression) -> string {
@@ -146,6 +148,8 @@ expression_to_string :: proc(expr: ^Expression) -> string {
 	case If_Expression:
 		return to_string(&v)
 	case Function_Literal:
+		return to_string(&v)
+	case Call_Expression:
 		return to_string(&v)
 	case:
 		return "Unknown Expression"
@@ -237,6 +241,30 @@ function_literal_to_string :: proc(expr: ^Function_Literal) -> string {
 	strings.write_string(&sb, ") ")
 
 	strings.write_string(&sb, to_string(expr.body))
+
+	return strings.clone(strings.to_string(sb))
+}
+
+Call_Arguments :: [dynamic]^Expression
+Call_Expression :: struct {
+	token:     Token, // The '(' token
+	function:  ^Expression, // Identifier or Function_Literal
+	arguments: ^Call_Arguments,
+}
+call_expression_to_string :: proc(expr: ^Call_Expression) -> string {
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+
+	args := make([dynamic]string, 0, len(expr.arguments))
+	defer delete(args)
+	for a in expr.arguments {
+		append(&args, to_string(a))
+	}
+
+	strings.write_string(&sb, to_string(expr.function))
+	strings.write_rune(&sb, '(')
+	strings.write_string(&sb, strings.join(args[:], ", "))
+	strings.write_rune(&sb, ')')
 
 	return strings.clone(strings.to_string(sb))
 }

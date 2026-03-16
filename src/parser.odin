@@ -25,6 +25,7 @@ predecence_table := map[Token_Type]Precedence {
 	.MINUS    = .SUM,
 	.SLASH    = .PRODUCT,
 	.ASTERISK = .PRODUCT,
+	.LPAREN   = .CALL,
 }
 
 peek_precedence :: proc(p: ^Parser) -> Precedence {
@@ -89,6 +90,7 @@ parser_init :: proc(l: ^Lexer, allocator := context.allocator) -> ^Parser {
 	register_infix(p, .GT, parse_infix_expression)
 	register_infix(p, .EQ, parse_infix_expression)
 	register_infix(p, .NOT_EQ, parse_infix_expression)
+	register_infix(p, .LPAREN, parse_call_expression)
 
 	parse_next_token(p)
 	parse_next_token(p)
@@ -379,6 +381,42 @@ parse_function_parameters :: proc(p: ^Parser) -> ^[dynamic]Identifier {
 	return idents
 }
 
+parse_call_expression :: proc(p: ^Parser, fn: ^Expression) -> Expression {
+	expr := Call_Expression {
+		token    = p.cur_tok,
+		function = new_clone(fn^, p.allocator),
+	}
+	expr.arguments = parse_call_arguments(p)
+
+	return Expression{expr}
+}
+
+parse_call_arguments :: proc(p: ^Parser) -> ^Call_Arguments {
+	args := new(Call_Arguments, p.allocator)
+
+	if p.peek_tok.type == .RPAREN {
+		parse_next_token(p)
+		return args
+	}
+
+	parse_next_token(p)
+	expr := new_clone(parse_expression(p, .LOWEST), p.allocator)
+	append(args, expr)
+
+	for p.peek_tok.type == .COMMA {
+		parse_next_token(p)
+		parse_next_token(p)
+		expr := new_clone(parse_expression(p, .LOWEST), p.allocator)
+		append(args, expr)
+	}
+
+	if !expect_peek(p, .RPAREN) {
+		return nil
+	}
+
+	return args
+}
+
 expect_peek :: proc(p: ^Parser, type: Token_Type) -> bool {
 	if p.peek_tok.type == type {
 		parse_next_token(p)
@@ -393,4 +431,3 @@ peek_error :: proc(p: ^Parser, type: Token_Type) {
 	msg := fmt.tprintf("expected next to be `%s`, got `%s` instead", type, p.peek_tok.type)
 	append(&p.errors, msg)
 }
-
