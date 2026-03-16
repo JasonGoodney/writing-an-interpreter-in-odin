@@ -78,6 +78,7 @@ parser_init :: proc(l: ^Lexer, allocator := context.allocator) -> ^Parser {
 	register_prefix(p, .FALSE, parse_boolean)
 	register_prefix(p, .LPAREN, parse_grouped_expression)
 	register_prefix(p, .IF, parse_if_expression)
+	register_prefix(p, .FUNCTION, parse_function_literal)
 
 	p.infix_parse_fns = make(type_of(p.infix_parse_fns), allocator)
 	register_infix(p, .PLUS, parse_infix_expression)
@@ -330,6 +331,52 @@ parse_if_expression :: proc(p: ^Parser) -> Expression {
 	}
 
 	return Expression{expr}
+}
+
+parse_function_literal :: proc(p: ^Parser) -> Expression {
+	fn := Function_Literal {
+		token = p.cur_tok,
+	}
+
+	if !expect_peek(p, .LPAREN) {
+		return {}
+	}
+
+	params := parse_function_parameters(p)
+	fn.parameters = params
+
+	if !expect_peek(p, .LBRACE) {
+		return {}
+	}
+
+	fn.body = new_clone(parse_block_statement(p), p.allocator)
+
+	return Expression{fn}
+}
+
+parse_function_parameters :: proc(p: ^Parser) -> ^[dynamic]Identifier {
+	idents := new([dynamic]Identifier, p.allocator)
+	if p.peek_tok.type == .RPAREN {
+		parse_next_token(p) // consume rparen
+		return idents
+	}
+
+	parse_next_token(p) // consume rparen
+
+	ident := Identifier{p.cur_tok, p.cur_tok.literal}
+	append(idents, ident)
+	for p.peek_tok.type == .COMMA {
+		parse_next_token(p) // consume comma
+		parse_next_token(p) // consume identifier
+		ident := Identifier{p.cur_tok, p.cur_tok.literal}
+		append(idents, ident)
+	}
+
+	if !expect_peek(p, .RPAREN) {
+		return idents
+	}
+
+	return idents
 }
 
 expect_peek :: proc(p: ^Parser, type: Token_Type) -> bool {

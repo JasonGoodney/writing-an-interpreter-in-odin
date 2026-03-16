@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:slice"
 import "core:strings"
 
 Node :: union {
@@ -26,6 +27,7 @@ to_string :: proc {
 	infix_expression_to_string,
 	boolean_to_string,
 	if_expression_to_string,
+	function_literal_to_string,
 }
 
 Program :: struct {
@@ -37,11 +39,9 @@ program_to_string :: proc(prog: ^Program, allocator := context.allocator) -> str
 	defer strings.builder_destroy(&sb)
 	for &s in prog.statements {
 		str := to_string(&s)
-		// append_elem_string(&buf, str)
 		strings.write_string(&sb, str)
 	}
 
-	// str := string(buf[:])
 	str := strings.clone(strings.to_string(sb), allocator)
 	return str
 }
@@ -128,6 +128,7 @@ Expression :: struct {
 		Infix_Expression,
 		Boolean,
 		If_Expression,
+		Function_Literal,
 	},
 }
 expression_to_string :: proc(expr: ^Expression) -> string {
@@ -143,6 +144,8 @@ expression_to_string :: proc(expr: ^Expression) -> string {
 	case Boolean:
 		return to_string(&v)
 	case If_Expression:
+		return to_string(&v)
+	case Function_Literal:
 		return to_string(&v)
 	case:
 		return "Unknown Expression"
@@ -211,6 +214,29 @@ if_expression_to_string :: proc(expr: ^If_Expression) -> string {
 		strings.write_string(&sb, "else ")
 		strings.write_string(&sb, to_string(expr.alternative))
 	}
+
+	return strings.clone(strings.to_string(sb))
+}
+
+Function_Parameters :: [dynamic]Identifier
+Function_Literal :: struct {
+	token:      Token,
+	parameters: ^Function_Parameters,
+	body:       ^Block_Statement,
+}
+function_literal_to_string :: proc(expr: ^Function_Literal) -> string {
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+
+	strings.write_string(&sb, expr.token.literal)
+	strings.write_string(&sb, "(")
+	params := slice.mapper(expr.parameters[:], proc(id: Identifier) -> string {
+		return id.value
+	})
+	paramlist := strings.join(params, ", ")
+	strings.write_string(&sb, ") ")
+
+	strings.write_string(&sb, to_string(expr.body))
 
 	return strings.clone(strings.to_string(sb))
 }
