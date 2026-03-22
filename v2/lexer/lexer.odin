@@ -19,16 +19,6 @@ init :: proc(input: string, allocator := context.allocator) -> ^Lexer {
 	return l
 }
 
-read_char :: proc(l: ^Lexer) {
-	if l.read_pos >= len(l.input) {
-		l.ch = 0
-	} else {
-		l.ch = l.input[l.read_pos]
-	}
-	l.pos = l.read_pos
-	l.read_pos += 1
-}
-
 next_token :: proc(l: ^Lexer) -> token.Token {
 	tok: token.Token
 
@@ -100,12 +90,14 @@ new_token :: proc(type: token.Token_Type, chars: ..byte) -> token.Token {
 	return token.Token{type, literal}
 }
 
-is_letter :: proc(ch: byte) -> bool {
-	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
-}
-
-is_digit :: proc(ch: byte) -> bool {
-	return '0' <= ch && ch <= '9'
+read_char :: proc(l: ^Lexer) {
+	if l.read_pos >= len(l.input) {
+		l.ch = 0
+	} else {
+		l.ch = l.input[l.read_pos]
+	}
+	l.pos = l.read_pos
+	l.read_pos += 1
 }
 
 read_identifier :: proc(l: ^Lexer) -> string {
@@ -124,6 +116,14 @@ read_number :: proc(l: ^Lexer) -> string {
 	}
 	ident := l.input[start:l.pos]
 	return ident
+}
+
+is_letter :: proc(ch: byte) -> bool {
+	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
+}
+
+is_digit :: proc(ch: byte) -> bool {
+	return '0' <= ch && ch <= '9'
 }
 
 skip_whitespace :: proc(l: ^Lexer) {

@@ -10,8 +10,6 @@ expect :: proc(t: ^testing.T, ok: bool, format: string, args: ..any) -> bool {
 	return result
 }
 
-// expect :: testing.expectf
-
 @(test)
 test_next_token_1 :: proc(t: ^testing.T) {
 	input := `=+(){},;`
