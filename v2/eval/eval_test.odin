@@ -155,6 +155,43 @@ test_return_statements :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_error_handling :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:            string,
+		expected_message: Expected_Value,
+	} {
+		{"5 + true;", "type mismatch: INTEGER + BOOLEAN"},
+		{"5 + true; 5;", "type mismatch: INTEGER + BOOLEAN"},
+		{"-true", "unknown operator: -BOOLEAN"},
+		{"true + false;", "unknown operator: BOOLEAN + BOOLEAN"},
+		{"5; true + false; 5", "unknown operator: BOOLEAN + BOOLEAN"},
+		{"if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"},
+		{
+			`if (10 > 1) {
+			if (10 > 1) {
+			  return true + false;
+			}
+			return 1;
+		  }`,
+			"unknown operator: BOOLEAN + BOOLEAN",
+		},
+	}
+
+	for tt in tests {
+		evaluated := _test_eval(tt.input)
+		errobj, ok := evaluated.(object.Error)
+		expect(t, ok, "no error object returned. got=%T (%v)", evaluated, evaluated)
+		expect(
+			t,
+			errobj.message == tt.expected_message,
+			"wrong error message. expected=%s, got=%s",
+			tt.expected_message,
+			errobj.message,
+		)
+	}
+}
+
 // ============== Helpers ===============================
 
 _test_eval :: proc(input: string) -> object.Object {

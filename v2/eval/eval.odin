@@ -10,8 +10,11 @@ eval :: proc(node: ast.Node) -> object.Object {
 		result: object.Object
 		for stmt in n.stmts {
 			result = eval(ast.Node{stmt})
-			if rv, ok := result.(object.Return_Value); ok {
-				return rv.value^
+			#partial switch v in result {
+			case object.Return_Value:
+				return v.value^
+			case object.Error:
+				return v
 			}
 		}
 		return result
@@ -23,13 +26,17 @@ eval :: proc(node: ast.Node) -> object.Object {
 			result: object.Object
 			for stmt in s.stmts {
 				result = eval(ast.Node{stmt^})
-				if result != nil && get_typeid(&result) == object.Return_Value {
-					return result
+				if result != nil {
+					rt := object.get_typeid(&result)
+					if rt == object.Return_Value || rt == object.Error {
+						return result
+					}
 				}
 			}
 			return result
 		case ast.Return_Stmt:
 			val := eval(ast.Node{s.return_value})
+			if is_error(&val) {return val}
 			return object.Return_Value{&val}
 		}
 	case ast.Expr:
@@ -39,27 +46,36 @@ eval :: proc(node: ast.Node) -> object.Object {
 		case ast.Boolean:
 			return e.value ? object.TRUE : object.FALSE
 		case ast.Prefix_Expr:
+			right := eval(ast.Node{e.right^})
+			if is_error(&right) {return right}
 			switch e.op {
 			case "!":
-				obj := eval(ast.Node{e.right^})
-				b := is_truthy(obj)
+				b := is_truthy(&right)
 				return b ? object.FALSE : object.TRUE
 			case "-":
-				obj := eval(ast.Node{e.right^})
-				if integer, ok := obj.(object.Integer); ok {
+				if integer, ok := right.(object.Integer); ok {
 					return object.Integer{value = -integer.value}
 				} else {
-					return object.NULL
+					return new_error("unknown operator: %s%s", e.op, object.type_to_string(&right))
 				}
 			case:
-				return object.NULL
+				return new_error("unknown operator: %s%s", e.op, object.type_to_string(&right))
 			}
 		case ast.Infix_Expr:
 			left := eval(ast.Node{e.left^})
+			if is_error(&left) {return left}
 			right := eval(ast.Node{e.right^})
-			left_typeid := get_typeid(&left)
-			right_typeid := get_typeid(&right)
+			if is_error(&right) {return right}
+			left_typeid := object.get_typeid(&left)
+			right_typeid := object.get_typeid(&right)
 			switch {
+			case left_typeid != right_typeid:
+				return new_error(
+					"type mismatch: %s %s %s",
+					object.type_to_string(&left),
+					e.op,
+					object.type_to_string(&right),
+				)
 			case left_typeid == object.Integer && right_typeid == object.Integer:
 				l := left.(object.Integer).value
 				r := right.(object.Integer).value
@@ -81,7 +97,12 @@ eval :: proc(node: ast.Node) -> object.Object {
 				case "!=":
 					return l != r ? object.TRUE : object.FALSE
 				case:
-					return object.NULL
+					return new_error(
+						"unknown operator: %s %s %s",
+						object.type_to_string(&left),
+						e.op,
+						object.type_to_string(&right),
+					)
 				}
 			case left_typeid == object.Boolean && right_typeid == object.Boolean:
 				l := left.(object.Boolean).value
@@ -92,14 +113,20 @@ eval :: proc(node: ast.Node) -> object.Object {
 				case "!=":
 					return l != r ? object.TRUE : object.FALSE
 				case:
-					return object.NULL
+					return new_error(
+						"unknown operator: %s %s %s",
+						object.type_to_string(&left),
+						e.op,
+						object.type_to_string(&right),
+					)
 				}
 			case:
 				return object.NULL
 			}
 		case ast.If_Expr:
 			condition := eval(ast.Node{e.condition^})
-			if is_truthy(condition) {
+			if is_error(&condition) {return condition}
+			if is_truthy(&condition) {
 				obj := eval(ast.Node{ast.Stmt{e.consequence^}})
 				return obj
 			} else if e.alternative != nil {
@@ -114,22 +141,7 @@ eval :: proc(node: ast.Node) -> object.Object {
 	return {}
 }
 
-get_typeid :: proc(obj: ^object.Object) -> typeid {
-	switch v in obj {
-	case object.Integer:
-		return object.Integer
-	case object.Boolean:
-		return object.Boolean
-	case object.Null:
-		return object.Null
-	case object.Return_Value:
-		return object.Return_Value
-	}
-
-	return {}
-}
-
-is_truthy :: proc(obj: object.Object) -> bool {
+is_truthy :: proc(obj: ^object.Object) -> bool {
 	#partial switch v in obj {
 	case object.Boolean:
 		return v.value
@@ -137,5 +149,19 @@ is_truthy :: proc(obj: object.Object) -> bool {
 		return false
 	case:
 		return true
+	}
+}
+
+new_error :: proc(format: string, args: ..any) -> object.Object {
+	msg := fmt.tprintf(format, ..args)
+	return object.Error{msg}
+}
+
+is_error :: proc(obj: ^object.Object) -> bool {
+	#partial switch &v in obj {
+	case object.Error:
+		return true
+	case:
+		return false
 	}
 }
