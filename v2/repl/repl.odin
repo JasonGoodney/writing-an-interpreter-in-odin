@@ -12,6 +12,7 @@ import "core:io"
 start :: proc(reader: io.Reader, writer: io.Writer) {
 	scanner := new(bufio.Scanner)
 	scanner = bufio.scanner_init(scanner, reader)
+	env := object.env_init()
 
 	for {
 		allocator := context.temp_allocator
@@ -34,7 +35,7 @@ start :: proc(reader: io.Reader, writer: io.Writer) {
 			}
 		}
 
-		evaluated := eval.eval(ast.Node{program})
+		evaluated := eval.eval(ast.Node{program}, &env)
 		if evaluated != {} {
 			io.write_string(writer, object.inspect(&evaluated))
 			io.write_string(writer, "\n")

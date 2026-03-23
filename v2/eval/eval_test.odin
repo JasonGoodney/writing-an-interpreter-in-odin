@@ -156,6 +156,27 @@ test_return_statements :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_let_statements :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:    string,
+		expected: Expected_Value,
+	} {
+		{"let a = 5; a;", 5},
+		{"let a = 5 * 5; a;", 25},
+		{"let a = 5; let b = a; b;", 5},
+		{"let a = 5; let b = a; let c = a + b + 5; c;", 15},
+	}
+
+	for tt in tests {
+		evaluated := _test_eval(tt.input)
+		#partial switch v in tt.expected {
+		case i64:
+			_test_integer_object(t, evaluated, v)
+		}
+	}
+}
+
+@(test)
 test_error_handling :: proc(t: ^testing.T) {
 	tests := []struct {
 		input:            string,
@@ -176,6 +197,7 @@ test_error_handling :: proc(t: ^testing.T) {
 		  }`,
 			"unknown operator: BOOLEAN + BOOLEAN",
 		},
+		{"foobar", "identifier not found: foobar"},
 	}
 
 	for tt in tests {
@@ -198,7 +220,8 @@ _test_eval :: proc(input: string) -> object.Object {
 	l := lexer.init(input, context.temp_allocator)
 	p := parser.init(l, context.temp_allocator)
 	program := parser.parse_program(p)
-	obj := eval(ast.Node{program})
+	env := object.env_init()
+	obj := eval(ast.Node{program}, &env)
 	return obj
 }
 

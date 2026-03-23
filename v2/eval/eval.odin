@@ -4,12 +4,12 @@ import "../ast"
 import "../object"
 import "core:fmt"
 
-eval :: proc(node: ast.Node) -> object.Object {
+eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 	switch n in node.variant {
 	case ast.Program:
 		result: object.Object
 		for stmt in n.stmts {
-			result = eval(ast.Node{stmt})
+			result = eval(ast.Node{stmt}, env)
 			#partial switch v in result {
 			case object.Return_Value:
 				return v.value^
@@ -21,11 +21,11 @@ eval :: proc(node: ast.Node) -> object.Object {
 	case ast.Stmt:
 		#partial switch s in n.variant {
 		case ast.Expr_Stmt:
-			return eval(ast.Node{s.expr})
+			return eval(ast.Node{s.expr}, env)
 		case ast.Block_Stmt:
 			result: object.Object
 			for stmt in s.stmts {
-				result = eval(ast.Node{stmt^})
+				result = eval(ast.Node{stmt^}, env)
 				if result != nil {
 					rt := object.get_typeid(&result)
 					if rt == object.Return_Value || rt == object.Error {
@@ -35,9 +35,13 @@ eval :: proc(node: ast.Node) -> object.Object {
 			}
 			return result
 		case ast.Return_Stmt:
-			val := eval(ast.Node{s.return_value})
+			val := eval(ast.Node{s.return_value}, env)
 			if is_error(&val) {return val}
 			return object.Return_Value{&val}
+		case ast.Let_Stmt:
+			val := eval(ast.Node{s.value}, env)
+			if is_error(&val) {return val}
+			object.env_set(env, s.name.value, val)
 		}
 	case ast.Expr:
 		#partial switch e in n.variant {
@@ -45,8 +49,14 @@ eval :: proc(node: ast.Node) -> object.Object {
 			return object.Integer{e.value}
 		case ast.Boolean:
 			return e.value ? object.TRUE : object.FALSE
+		case ast.Ident:
+			val, ok := object.env_get(env, e.value)
+			if !ok {
+				return new_error("identifier not found: %s", e.value)
+			}
+			return val
 		case ast.Prefix_Expr:
-			right := eval(ast.Node{e.right^})
+			right := eval(ast.Node{e.right^}, env)
 			if is_error(&right) {return right}
 			switch e.op {
 			case "!":
@@ -62,9 +72,9 @@ eval :: proc(node: ast.Node) -> object.Object {
 				return new_error("unknown operator: %s%s", e.op, object.type_to_string(&right))
 			}
 		case ast.Infix_Expr:
-			left := eval(ast.Node{e.left^})
+			left := eval(ast.Node{e.left^}, env)
 			if is_error(&left) {return left}
-			right := eval(ast.Node{e.right^})
+			right := eval(ast.Node{e.right^}, env)
 			if is_error(&right) {return right}
 			left_typeid := object.get_typeid(&left)
 			right_typeid := object.get_typeid(&right)
@@ -124,13 +134,13 @@ eval :: proc(node: ast.Node) -> object.Object {
 				return object.NULL
 			}
 		case ast.If_Expr:
-			condition := eval(ast.Node{e.condition^})
+			condition := eval(ast.Node{e.condition^}, env)
 			if is_error(&condition) {return condition}
 			if is_truthy(&condition) {
-				obj := eval(ast.Node{ast.Stmt{e.consequence^}})
+				obj := eval(ast.Node{ast.Stmt{e.consequence^}}, env)
 				return obj
 			} else if e.alternative != nil {
-				obj := eval(ast.Node{ast.Stmt{e.alternative^}})
+				obj := eval(ast.Node{ast.Stmt{e.alternative^}}, env)
 				return obj
 			} else {
 				return object.NULL
