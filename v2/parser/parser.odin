@@ -24,14 +24,15 @@ Precedence :: enum {
 }
 
 precedence_table := map[token.Token_Type]Precedence {
-	.Equal     = .Equals,
-	.Not_Equal = .Equals,
-	.Less      = .Less_Greater,
-	.Greater   = .Less_Greater,
-	.Plus      = .Sum,
-	.Minus     = .Sum,
-	.Slash     = .Product,
-	.Asterisk  = .Product,
+	.Equal      = .Equals,
+	.Not_Equal  = .Equals,
+	.Less       = .Less_Greater,
+	.Greater    = .Less_Greater,
+	.Plus       = .Sum,
+	.Minus      = .Sum,
+	.Slash      = .Product,
+	.Asterisk   = .Product,
+	.Left_Paren = .Call,
 }
 
 peek_precedence :: proc(p: ^Parser) -> Precedence {
@@ -92,6 +93,7 @@ init :: proc(l: ^lexer.Lexer, allocator := context.allocator) -> ^Parser {
 	register_infix(p, .Less, parse_infix_expr)
 	register_infix(p, .Equal, parse_infix_expr)
 	register_infix(p, .Not_Equal, parse_infix_expr)
+	register_infix(p, .Left_Paren, parse_call_expr)
 
 	next_token(p)
 	next_token(p)
@@ -151,8 +153,9 @@ parse_let_stmt :: proc(p: ^Parser) -> ast.Stmt {
 	if !expect_peek(p, .Assign) {
 		return {}
 	}
-
-	for p.curr_tok.type != .Semicolon {
+	next_token(p)
+	letstmt.value = parse_expr(p, .Lowest)
+	if p.peek_tok.type == .Semicolon {
 		next_token(p)
 	}
 
@@ -164,7 +167,8 @@ parse_return_stmt :: proc(p: ^Parser) -> ast.Stmt {
 		token = p.curr_tok,
 	}
 	next_token(p)
-	for p.curr_tok.type != .Semicolon {
+	retstmt.return_value = parse_expr(p, .Lowest)
+	if p.peek_tok.type == .Semicolon {
 		next_token(p)
 	}
 	return ast.Stmt{retstmt}
@@ -356,6 +360,35 @@ parse_function_parameters :: proc(p: ^Parser) -> ^[dynamic]ast.Ident {
 		return {}
 	}
 	return idents
+}
+
+parse_call_expr :: proc(p: ^Parser, function: ^ast.Expr) -> ast.Expr {
+	callexpr := ast.Call_Expr {
+		token    = p.curr_tok,
+		function = new_clone(function^, p.allocator),
+	}
+	callexpr.arguments = parse_call_arguments(p)
+	return ast.Expr{callexpr}
+}
+
+parse_call_arguments :: proc(p: ^Parser) -> ^[dynamic]ast.Expr {
+	args := new([dynamic]ast.Expr, p.allocator)
+	if p.peek_tok.type == .Right_Paren {
+		next_token(p)
+		return args
+	}
+	next_token(p)
+	append(args, parse_expr(p, .Lowest))
+	for p.peek_tok.type == .Comma {
+		next_token(p)
+		next_token(p)
+		append(args, parse_expr(p, .Lowest))
+	}
+
+	if !expect_peek(p, .Right_Paren) {
+		return {}
+	}
+	return args
 }
 
 expect_peek :: proc(p: ^Parser, type: token.Token_Type) -> bool {

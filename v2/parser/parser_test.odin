@@ -47,10 +47,10 @@ test_let_statements :: proc(t: ^testing.T) {
 			testing.fail_now(t)
 		}
 
-		// value := stmt.variant.(Let_Stmt).value
-		// if !_test_literal_expression(t, value, tt.expected_value) {
-		// 	return
-		// }
+		value := stmt.variant.(ast.Let_Stmt).value
+		if !_test_literal_expression(t, value, tt.expected_value) {
+			return
+		}
 	}
 }
 
@@ -85,9 +85,9 @@ test_return_statements :: proc(t: ^testing.T) {
 			"returnStmt.TokenLiteral not 'return', got %q",
 			returnStmt.token.literal,
 		)
-		// if _test_literal_expression(t, returnStmt.return_value, tt.expectedValue) {
-		// 	return
-		// }
+		if _test_literal_expression(t, returnStmt.return_value, tt.expectedValue) {
+			return
+		}
 	}
 }
 
@@ -486,93 +486,89 @@ test_function_parameter_parsing :: proc(t: ^testing.T) {
 	}
 }
 
-// @(test)
-// test_call_expression_parsing :: proc(t: ^testing.T) {
-// 	input := `add(1, 2 * 3, 4 + 5);`
+@(test)
+test_call_expression_parsing :: proc(t: ^testing.T) {
+	input := `add(1, 2 * 3, 4 + 5);`
 
-// 	alloc := context.temp_allocator
-// 	defer free_all(alloc)
-// 	l := lexer.init(input, alloc)
-// 	p := parser.init(l, alloc)
-// 	prog := parse_program(p)
-// 	_check_parse_errors(t, p)
+	alloc := context.temp_allocator
+	defer free_all(alloc)
+	l := lexer.init(input, alloc)
+	p := parser.init(l, alloc)
+	prog := parse_program(p)
+	_check_parse_errors(t, p)
 
-// 	expect(
-// 		t,
-// 		len(prog.stmts) == 1,
-// 		"prog.stmts does not contain %s statements. got=%d",
-// 		1,
-// 		len(prog.stmts),
-// 	)
+	expect(
+		t,
+		len(prog.stmts) == 1,
+		"prog.stmts does not contain %s statements. got=%d",
+		1,
+		len(prog.stmts),
+	)
 
-// 	stmt, stmt_ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-// 	expect(t, stmt_ok, "stmt is not ast.Expr_Stmt. got=%T", prog.stmts[0])
+	stmt, stmt_ok := prog.stmts[0].variant.(ast.Expr_Stmt)
+	expect(t, stmt_ok, "stmt is not ast.Expr_Stmt. got=%T", prog.stmts[0])
 
-// 	expr, expr_ok := stmt.expr.variant.(Call_Expression)
-// 	expect(t, expr_ok, "stmt.expr not Call_Expression. got=%T", stmt.expr)
-
-
-// 	if !_test_identifier(t, expr.function^, "add") {
-// 		return
-// 	}
-
-// 	expect(
-// 		t,
-// 		len(expr.arguments) == 3,
-// 		"wrong argument count. got=%d",
-// 		len(expr.arguments),
-// 	)
-
-// 	_test_literal_expression(t, expr.arguments[0]^, i64(1))
-// 	_test_infix_expression(t, expr.arguments[1]^, i64(2), "*", i64(3))
-// 	_test_infix_expression(t, expr.arguments[2]^, i64(4), "+", i64(5))
-// }
-
-// @(test)
-// test_call_expression_parameter_parsing :: proc(t: ^testing.T) {
-// 	tests := []struct {
-// 		input:         string,
-// 		expectedIdent: string,
-// 		expectedArgs:  []string,
-// 	} {
-// 		{"add();", "add", []string{}},
-// 		{"add(1);", "add", []string{"1"}},
-// 		{"add(1, 2 * 3, 4 + 5);", "add", []string{"1", "(2 * 3)", "(4 + 5)"}},
-// 	}
-
-// 	for tt in tests {
-// 		alloc := context.temp_allocator
-// 		defer free_all(alloc)
-// 		l := lexer.init(tt.input, alloc)
-// 		p := parser.init(l, alloc)
-// 		prog := parse_program(p)
-// 		_check_parse_errors(t, p)
+	expr, expr_ok := stmt.expr.variant.(ast.Call_Expr)
+	expect(t, expr_ok, "stmt.expr not Call_Expression. got=%T", stmt.expr)
 
 
-// 		stmt, stmt_ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-// 		expect(t, stmt_ok, "stmt is not ast.Expr_Stmt. got=%T", prog.stmts[0])
+	if !_test_identifier(t, expr.function^, "add") {
+		return
+	}
 
-// 		expr, expr_ok := stmt.expr.variant.(Call_Expression)
-// 		expect(t, expr_ok, "stmt.expr not Call_Expression. got=%T", stmt.expr)
+	expect(t, len(expr.arguments) == 3, "wrong argument count. got=%d", len(expr.arguments))
 
-// 		if !_test_identifier(t, expr.function^, "add") {
-// 			return
-// 		}
+	_test_literal_expression(t, expr.arguments[0], i64(1))
+	_test_infix_expression(t, expr.arguments[1], i64(2), "*", i64(3))
+	_test_infix_expression(t, expr.arguments[2], i64(4), "+", i64(5))
+}
 
-// 		expect(
-// 			t,
-// 			len(expr.arguments) == len(tt.expectedArgs),
-// 			"wrong argument count. got=%d",
-// 			len(expr.arguments),
-// 		)
+@(test)
+test_call_expression_parameter_parsing :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:         string,
+		expectedIdent: string,
+		expectedArgs:  []string,
+	} {
+		{"add();", "add", []string{}},
+		{"add(1);", "add", []string{"1"}},
+		{"add(1, 2 * 3, 4 + 5);", "add", []string{"1", "(2 * 3)", "(4 + 5)"}},
+	}
+
+	for tt in tests {
+		alloc := context.temp_allocator
+		defer free_all(alloc)
+		l := lexer.init(tt.input, alloc)
+		p := parser.init(l, alloc)
+		prog := parse_program(p)
+		_check_parse_errors(t, p)
 
 
-// 		for arg, i in tt.expectedArgs {
-// 			s := to_string(expr.arguments[i])
-// 			expect(t, s == arg, "argument %d wrong. expected=%s, got=%s", arg, s)
-// 		}
-// 	}
-// }
+		stmt, stmt_ok := prog.stmts[0].variant.(ast.Expr_Stmt)
+		expect(t, stmt_ok, "stmt is not ast.Expr_Stmt. got=%T", prog.stmts[0])
+
+		expr, expr_ok := stmt.expr.variant.(ast.Call_Expr)
+		expect(t, expr_ok, "stmt.expr not Call_Expression. got=%T", stmt.expr)
+
+		if !_test_identifier(t, expr.function^, "add") {
+			return
+		}
+
+		expect(
+			t,
+			len(expr.arguments) == len(tt.expectedArgs),
+			"wrong argument count. got=%d",
+			len(expr.arguments),
+		)
+
+
+		for arg, i in tt.expectedArgs {
+			e := expr.arguments[i]
+			s := ast.expr_to_string(&e)
+			expect(t, s == arg, "argument %d wrong. expected=%s, got=%s", arg, s)
+		}
+	}
+}
 
 //
 // ========= Helpers ==========================
