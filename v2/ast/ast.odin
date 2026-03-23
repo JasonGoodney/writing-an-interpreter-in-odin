@@ -18,8 +18,13 @@ to_string :: proc {
 	let_stmt_to_string,
 	return_stmt_to_string,
 	expr_stmt_to_string,
+	block_stmt_to_string,
 	ident_to_string,
-	integer_literal_to_sstring,
+	integer_literal_to_string,
+	boolean_to_string,
+	prefix_expr_to_string,
+	infix_expr_to_string,
+	if_expr_to_string,
 }
 
 // ======= Program =============================
@@ -44,6 +49,7 @@ Stmt :: struct {
 		Let_Stmt,
 		Return_Stmt,
 		Expr_Stmt,
+		Block_Stmt,
 	},
 }
 stmt_to_string :: proc(stmt: ^Stmt) -> string {
@@ -54,26 +60,10 @@ stmt_to_string :: proc(stmt: ^Stmt) -> string {
 		return to_string(&v)
 	case Expr_Stmt:
 		return to_string(&v)
+	case Block_Stmt:
+		return to_string(&v)
 	case:
 		return fmt.tprintf("Unknown statement: %v", stmt)
-	}
-}
-
-// ======= Expression =============================
-Expr :: struct {
-	variant: union {
-		Ident,
-		Integer_Literal,
-	},
-}
-expr_to_string :: proc(expr: ^Expr) -> string {
-	switch &v in expr.variant {
-	case Ident:
-		return to_string(&v)
-	case Integer_Literal:
-		return to_string(&v)
-	case:
-		return fmt.tprintf("Unknown expression: %v", expr)
 	}
 }
 
@@ -109,6 +99,48 @@ expr_stmt_to_string :: proc(stmt: ^Expr_Stmt) -> string {
 	return to_string(&stmt.expr)
 }
 
+Block_Stmt :: struct {
+	token: token.Token,
+	stmts: [dynamic]^Stmt,
+}
+block_stmt_to_string :: proc(stmt: ^Block_Stmt) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	for s in stmt.stmts {
+		strings.write_string(&sb, stmt_to_string(s))
+	}
+	return strings.clone(strings.to_string(sb), context.temp_allocator)
+}
+
+// ======= Expression =============================
+Expr :: struct {
+	variant: union {
+		Ident,
+		Integer_Literal,
+		Boolean,
+		Prefix_Expr,
+		Infix_Expr,
+		If_Expr,
+	},
+}
+expr_to_string :: proc(expr: ^Expr) -> string {
+	switch &v in expr.variant {
+	case Ident:
+		return to_string(&v)
+	case Integer_Literal:
+		return to_string(&v)
+	case Boolean:
+		return to_string(&v)
+	case Prefix_Expr:
+		return to_string(&v)
+	case Infix_Expr:
+		return to_string(&v)
+	case If_Expr:
+		return to_string(&v)
+	case:
+		return fmt.tprintf("Unknown expression: %v", expr)
+	}
+}
+
 Ident :: struct {
 	token: token.Token,
 	value: string,
@@ -121,6 +153,66 @@ Integer_Literal :: struct {
 	token: token.Token,
 	value: i64,
 }
-integer_literal_to_sstring :: proc(expr: ^Integer_Literal) -> string {
-	return fmt.tprintf("%s", expr.value)
+integer_literal_to_string :: proc(expr: ^Integer_Literal) -> string {
+	return expr.token.literal
+}
+Boolean :: struct {
+	token: token.Token,
+	value: bool,
+}
+boolean_to_string :: proc(expr: ^Boolean) -> string {
+	return expr.token.literal
+}
+
+Prefix_Expr :: struct {
+	token: token.Token,
+	op:    string,
+	right: ^Expr,
+}
+prefix_expr_to_string :: proc(expr: ^Prefix_Expr) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	strings.write_string(&sb, "(")
+	strings.write_string(&sb, expr.op)
+	strings.write_string(&sb, to_string(expr.right))
+	strings.write_string(&sb, ")")
+	return strings.clone(strings.to_string(sb), context.temp_allocator)
+}
+
+Infix_Expr :: struct {
+	token: token.Token,
+	op:    string,
+	left:  ^Expr,
+	right: ^Expr,
+}
+infix_expr_to_string :: proc(expr: ^Infix_Expr) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	strings.write_string(&sb, "(")
+	strings.write_string(&sb, to_string(expr.left))
+	strings.write_string(&sb, " ")
+	strings.write_string(&sb, expr.op)
+	strings.write_string(&sb, " ")
+	strings.write_string(&sb, to_string(expr.right))
+	strings.write_string(&sb, ")")
+	return strings.clone(strings.to_string(sb), context.temp_allocator)
+}
+
+If_Expr :: struct {
+	token:       token.Token,
+	condition:   ^Expr,
+	consequence: ^Block_Stmt,
+	alternative: ^Block_Stmt,
+}
+
+if_expr_to_string :: proc(expr: ^If_Expr) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	strings.write_string(&sb, "if")
+	strings.write_string(&sb, to_string(expr.condition))
+	strings.write_string(&sb, " ")
+	strings.write_string(&sb, to_string(expr.consequence))
+	if expr.alternative != nil {
+		strings.write_string(&sb, "else ")
+		strings.write_string(&sb, to_string(expr.alternative))
+	}
+
+	return strings.clone(strings.to_string(sb), context.temp_allocator)
 }
