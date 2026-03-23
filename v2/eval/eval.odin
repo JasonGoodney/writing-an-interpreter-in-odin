@@ -10,6 +10,9 @@ eval :: proc(node: ast.Node) -> object.Object {
 		result: object.Object
 		for stmt in n.stmts {
 			result = eval(ast.Node{stmt})
+			if rv, ok := result.(object.Return_Value); ok {
+				return rv.value^
+			}
 		}
 		return result
 	case ast.Stmt:
@@ -20,8 +23,14 @@ eval :: proc(node: ast.Node) -> object.Object {
 			result: object.Object
 			for stmt in s.stmts {
 				result = eval(ast.Node{stmt^})
+				if result != nil && get_typeid(&result) == object.Return_Value {
+					return result
+				}
 			}
 			return result
+		case ast.Return_Stmt:
+			val := eval(ast.Node{s.return_value})
+			return object.Return_Value{&val}
 		}
 	case ast.Expr:
 		#partial switch e in n.variant {
@@ -48,8 +57,8 @@ eval :: proc(node: ast.Node) -> object.Object {
 		case ast.Infix_Expr:
 			left := eval(ast.Node{e.left^})
 			right := eval(ast.Node{e.right^})
-			left_typeid := typeid_of(&left)
-			right_typeid := typeid_of(&right)
+			left_typeid := get_typeid(&left)
+			right_typeid := get_typeid(&right)
 			switch {
 			case left_typeid == object.Integer && right_typeid == object.Integer:
 				l := left.(object.Integer).value
@@ -105,7 +114,7 @@ eval :: proc(node: ast.Node) -> object.Object {
 	return {}
 }
 
-typeid_of :: proc(obj: ^object.Object) -> typeid {
+get_typeid :: proc(obj: ^object.Object) -> typeid {
 	switch v in obj {
 	case object.Integer:
 		return object.Integer
@@ -113,6 +122,8 @@ typeid_of :: proc(obj: ^object.Object) -> typeid {
 		return object.Boolean
 	case object.Null:
 		return object.Null
+	case object.Return_Value:
+		return object.Return_Value
 	}
 
 	return {}

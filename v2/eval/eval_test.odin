@@ -126,6 +126,35 @@ test_if_else_expressions :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_return_statements :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:    string,
+		expected: Expected_Value,
+	} {
+		{"return 10;", 10},
+		{"return 10; 9;", 10},
+		{"return 2 * 5; 9;", 10},
+		{"9; return 2 * 5; 9;", 10},
+		{`if (10 > 1) {
+			if (10 > 1) {
+				return 10;
+			}
+			return 1;
+		 }`, 10},
+	}
+
+	for tt in tests {
+		evaluated := _test_eval(tt.input)
+		#partial switch v in tt.expected {
+		case i64:
+			_test_integer_object(t, evaluated, v)
+		case:
+			_test_null_object(t, evaluated)
+		}
+	}
+}
+
 // ============== Helpers ===============================
 
 _test_eval :: proc(input: string) -> object.Object {

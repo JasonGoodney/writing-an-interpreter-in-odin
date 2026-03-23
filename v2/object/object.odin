@@ -16,10 +16,15 @@ Boolean :: struct {
 
 Null :: struct {}
 
+Return_Value :: struct {
+	value: ^Object,
+}
+
 Object :: union {
 	Integer,
 	Boolean,
 	Null,
+	Return_Value,
 }
 
 inspect :: proc(object: ^Object) -> string {
@@ -30,6 +35,8 @@ inspect :: proc(object: ^Object) -> string {
 		return fmt.tprintf("%t", v.value)
 	case Null:
 		return "null"
+	case Return_Value:
+		return inspect(v.value)
 	case:
 		return fmt.tprintf("Unknown object: %T", object)
 	}
