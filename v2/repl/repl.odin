@@ -1,7 +1,9 @@
 package repl
 
 import "../ast"
+import "../eval"
 import "../lexer"
+import "../object"
 import "../parser"
 import "core:bufio"
 import "core:fmt"
@@ -32,7 +34,10 @@ start :: proc(reader: io.Reader, writer: io.Writer) {
 			}
 		}
 
-		io.write_string(writer, ast.program_to_string(&program))
-		io.write_string(writer, "\n")
+		evaluated := eval.eval(ast.Node{program})
+		if evaluated != {} {
+			io.write_string(writer, object.inspect(&evaluated))
+			io.write_string(writer, "\n")
+		}
 	}
 }
