@@ -403,99 +403,88 @@ test_if_else_expression :: proc(t: ^testing.T) {
 	}
 }
 
-// @(test)
-// test_function_literal :: proc(t: ^testing.T) {
-// 	input := `fn(x, y) { x + y; }`
+@(test)
+test_function_literal :: proc(t: ^testing.T) {
+	input := `fn(x, y) { x + y; }`
 
-// 	alloc := context.temp_allocator
-// 	free_all(alloc)
-// 	l := lexer.init(input, alloc)
-// 	p := parser.init(l, alloc)
-// 	prog := parse_program(p)
-// 	_check_parse_errors(t, p)
+	alloc := context.temp_allocator
+	free_all(alloc)
+	l := lexer.init(input, alloc)
+	p := parser.init(l, alloc)
+	prog := parse_program(p)
+	_check_parse_errors(t, p)
 
 
-// 	expect(
-// 		t,
-// 		len(prog.stmts) == 1,
-// 		"program has not enough statements, got=`%d`",
-// 		len(prog.stmts),
-// 	)
-// 	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-// 	expect(
-// 		t,
-// 		ok,
-// 		"prog.stmts[0] is not ast.Expr_Stmt. got=`%T`",
-// 		prog.stmts[0].variant,
-// 	)
+	expect(t, len(prog.stmts) == 1, "program has not enough statements, got=`%d`", len(prog.stmts))
+	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
+	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
 
-// 	fnexpr, if_ok := stmt.expr.variant.(Function_Literal)
-// 	expect(t, ok, "stmt.expr is not Function_Literal. got=%T", stmt.expr.variant)
+	fnexpr, if_ok := stmt.expr.variant.(ast.Function_Literal)
+	expect(t, ok, "stmt.expr is not Function_Literal. got=%T", stmt.expr.variant)
 
-// 	expect(
-// 		t,
-// 		len(fnexpr.parameters) == 2,
-// 		"fn literal len parameters. expected=2, got=%d",
-// 		len(fnexpr.parameters),
-// 	)
+	expect(
+		t,
+		len(fnexpr.parameters) == 2,
+		"fn literal len parameters. expected=2, got=%d",
+		len(fnexpr.parameters),
+	)
 
-// 	_test_literal_expression(t, Expression{fnexpr.parameters[0]}, "x")
-// 	_test_literal_expression(t, Expression{fnexpr.parameters[1]}, "y")
+	_test_literal_expression(t, ast.Expr{fnexpr.parameters[0]}, "x")
+	_test_literal_expression(t, ast.Expr{fnexpr.parameters[1]}, "y")
 
-// 	expect(
-// 		t,
-// 		len(fnexpr.body.statements) == 1,
-// 		"fn.body.statements expected=1, got=%d",
-// 		len(fnexpr.body.statements),
-// 	)
+	expect(
+		t,
+		len(fnexpr.body.stmts) == 1,
+		"fn.body.statements expected=1, got=%d",
+		len(fnexpr.body.stmts),
+	)
 
-// 	bodystmt, body_ok := fnexpr.body.statements[0].variant.(ast.Expr_Stmt)
-// 	expect(
-// 		t,
-// 		body_ok,
-// 		"fn body stmt is not Expression_Satement. got=%T",
-// 		fnexpr.body.statements[0].variant.(ast.Expr_Stmt),
-// 	)
+	bodystmt, body_ok := fnexpr.body.stmts[0].variant.(ast.Expr_Stmt)
+	expect(
+		t,
+		body_ok,
+		"fn body stmt is not Expression_Satement. got=%T",
+		fnexpr.body.stmts[0].variant.(ast.Expr_Stmt),
+	)
 
-// 	_test_infix_expression(t, bodystmt.expr, "x", "+", "y")
-// }
+	_test_infix_expression(t, bodystmt.expr, "x", "+", "y")
+}
 
-// @(test)
-// test_function_parameter_parsing :: proc(t: ^testing.T) {
-// 	tests := []struct {
-// 		input:           string,
-// 		expected_params: []string,
-// 	} {
-// 		{"fn() {};", []string{}},
-// 		{"fn(x) {};", []string{"x"}},
-// 		{"fn(x,y,z) {};", []string{"x", "y", "z"}},
-// 	}
+@(test)
+test_function_parameter_parsing :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:           string,
+		expected_params: []string,
+	} {
+		{"fn() {};", []string{}},
+		{"fn(x) {};", []string{"x"}},
+		{"fn(x,y,z) {};", []string{"x", "y", "z"}},
+	}
 
-// 	for tt in tests {
-// 		alloc := context.temp_allocator
-// 		defer free_all(alloc)
-// 		l := lexer.init(tt.input, alloc)
-// 		p := parser.init(l, alloc)
-// 		prog := parse_program(p)
-// 		_check_parse_errors(t, p)
+	for tt in tests {
+		alloc := context.temp_allocator
+		defer free_all(alloc)
+		l := lexer.init(tt.input, alloc)
+		p := parser.init(l, alloc)
+		prog := parse_program(p)
+		_check_parse_errors(t, p)
 
-// 		stmt := prog.stmts[0].variant.(ast.Expr_Stmt)
-// 		fn := stmt.expr.variant.(Function_Literal)
+		stmt := prog.stmts[0].variant.(ast.Expr_Stmt)
+		fn := stmt.expr.variant.(ast.Function_Literal)
 
-// 		expect(
-// 			t,
-// 			len(fn.parameters) == len(tt.expected_params),
-// 			"param count wrong. expected=%d, got=%d",
-// 			len(tt.expected_params),
-// 			len(fn.parameters),
-// 		)
+		expect(
+			t,
+			len(fn.parameters) == len(tt.expected_params),
+			"param count wrong. expected=%d, got=%d",
+			len(tt.expected_params),
+			len(fn.parameters),
+		)
 
-// 		for ident, i in tt.expected_params {
-// 			_test_literal_expression(t, Expression{fn.parameters[i]}, ident)
-// 		}
-// 	}
-
-// }
+		for ident, i in tt.expected_params {
+			_test_literal_expression(t, ast.Expr{fn.parameters[i]}, ident)
+		}
+	}
+}
 
 // @(test)
 // test_call_expression_parsing :: proc(t: ^testing.T) {

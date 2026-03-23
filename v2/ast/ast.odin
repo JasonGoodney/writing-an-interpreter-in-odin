@@ -25,6 +25,7 @@ to_string :: proc {
 	prefix_expr_to_string,
 	infix_expr_to_string,
 	if_expr_to_string,
+	function_literal_to_string,
 }
 
 // ======= Program =============================
@@ -120,6 +121,7 @@ Expr :: struct {
 		Prefix_Expr,
 		Infix_Expr,
 		If_Expr,
+		Function_Literal,
 	},
 }
 expr_to_string :: proc(expr: ^Expr) -> string {
@@ -135,6 +137,8 @@ expr_to_string :: proc(expr: ^Expr) -> string {
 	case Infix_Expr:
 		return to_string(&v)
 	case If_Expr:
+		return to_string(&v)
+	case Function_Literal:
 		return to_string(&v)
 	case:
 		return fmt.tprintf("Unknown expression: %v", expr)
@@ -213,6 +217,28 @@ if_expr_to_string :: proc(expr: ^If_Expr) -> string {
 		strings.write_string(&sb, "else ")
 		strings.write_string(&sb, to_string(expr.alternative))
 	}
+
+	return strings.clone(strings.to_string(sb), context.temp_allocator)
+}
+
+Function_Literal :: struct {
+	token:      token.Token,
+	parameters: ^[dynamic]Ident,
+	body:       ^Block_Stmt,
+}
+function_literal_to_string :: proc(expr: ^Function_Literal) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	strings.write_string(&sb, expr.token.literal)
+	strings.write_string(&sb, "(")
+	if len(expr.parameters) > 0 {
+		strings.write_string(&sb, to_string(&expr.parameters[0]))
+		for i := 1; i < len(expr.parameters); i += 1 {
+			strings.write_string(&sb, ", ")
+			strings.write_string(&sb, to_string(&expr.parameters[i]))
+		}
+	}
+	strings.write_string(&sb, ")")
+	strings.write_string(&sb, to_string(expr.body))
 
 	return strings.clone(strings.to_string(sb), context.temp_allocator)
 }

@@ -81,6 +81,7 @@ init :: proc(l: ^lexer.Lexer, allocator := context.allocator) -> ^Parser {
 	register_prefix(p, .False, parse_boolean)
 	register_prefix(p, .Left_Paren, parse_grouped_expr)
 	register_prefix(p, .If, parse_if_expr)
+	register_prefix(p, .Function, parse_function_literal)
 
 	p.infix_parse_fns = make(type_of(p.infix_parse_fns), p.allocator)
 	register_infix(p, .Plus, parse_infix_expr)
@@ -313,6 +314,48 @@ parse_if_expr :: proc(p: ^Parser) -> ast.Expr {
 	}
 
 	return ast.Expr{ifexpr}
+}
+
+parse_function_literal :: proc(p: ^Parser) -> ast.Expr {
+	fnexpr := ast.Function_Literal {
+		token = p.curr_tok,
+	}
+	if !expect_peek(p, .Left_Paren) {
+		return {}
+	}
+	fnexpr.parameters = parse_function_parameters(p)
+	if !expect_peek(p, .Left_Brace) {
+		return {}
+	}
+	fnexpr.body = new_clone(parse_block_stmt(p), p.allocator)
+	return ast.Expr{fnexpr}
+}
+
+parse_function_parameters :: proc(p: ^Parser) -> ^[dynamic]ast.Ident {
+	idents := new([dynamic]ast.Ident, p.allocator)
+	if p.peek_tok.type == .Right_Paren {
+		next_token(p)
+		return idents
+	}
+	next_token(p)
+	ident := ast.Ident {
+		token = p.curr_tok,
+		value = p.curr_tok.literal,
+	}
+	append(idents, ident)
+	for p.peek_tok.type == .Comma {
+		next_token(p)
+		next_token(p)
+		ident := ast.Ident {
+			token = p.curr_tok,
+			value = p.curr_tok.literal,
+		}
+		append(idents, ident)
+	}
+	if !expect_peek(p, .Right_Paren) {
+		return {}
+	}
+	return idents
 }
 
 expect_peek :: proc(p: ^Parser, type: token.Token_Type) -> bool {
