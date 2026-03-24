@@ -40,6 +40,9 @@ next_token :: proc(l: ^Lexer) -> token.Token {
 		} else {
 			tok = new_token(.Bang, l.ch)
 		}
+	case '"':
+		tok.literal = read_string(l)
+		tok.type = .String
 	case ';':
 		tok = new_token(.Semicolon, l.ch)
 	case '(':
@@ -118,6 +121,16 @@ read_number :: proc(l: ^Lexer) -> string {
 	return ident
 }
 
+read_string :: proc(l: ^Lexer) -> string {
+	read_char(l)
+	pos := l.pos
+	for l.ch != '"' && l.ch != 0 {
+		read_char(l)
+	}
+	s := l.input[pos:l.pos]
+	return s
+}
+
 is_letter :: proc(ch: byte) -> bool {
 	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
 }
@@ -138,3 +151,4 @@ peek_token :: proc(l: ^Lexer) -> byte {
 	}
 	return l.input[l.read_pos]
 }
+

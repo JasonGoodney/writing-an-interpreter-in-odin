@@ -32,6 +32,10 @@ Function :: struct {
 	env:        ^Env,
 }
 
+String :: struct {
+	value: string,
+}
+
 Object :: union {
 	Integer,
 	Boolean,
@@ -39,6 +43,7 @@ Object :: union {
 	Return_Value,
 	Error,
 	Function,
+	String,
 }
 
 inspect :: proc(object: ^Object) -> string {
@@ -67,6 +72,8 @@ inspect :: proc(object: ^Object) -> string {
 		strings.write_string(&sb, ast.to_string(v.body))
 		strings.write_string(&sb, "\n")
 		return strings.clone(strings.to_string(sb))
+	case String:
+		return v.value
 	case:
 		return fmt.tprintf("Unknown object: %T", object^)
 	}
@@ -86,6 +93,8 @@ get_typeid :: proc(obj: ^Object) -> typeid {
 		return Error
 	case Function:
 		return Function
+	case String:
+		return String
 	}
 
 	return {}
@@ -95,3 +104,4 @@ to_string :: proc(obj: ^Object) -> string {
 	s := fmt.tprintf("%s", get_typeid(obj))
 	return strings.to_upper(s)
 }
+

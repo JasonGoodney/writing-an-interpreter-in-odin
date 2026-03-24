@@ -3,6 +3,8 @@ package eval
 import "../ast"
 import "../object"
 import "core:fmt"
+import "core:mem/virtual"
+import "core:strings"
 
 eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 	switch n in node.variant {
@@ -45,6 +47,8 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 		#partial switch e in n.variant {
 		case ast.Integer_Literal:
 			return object.Integer{e.value}
+		case ast.String_Literal:
+			return object.String{e.value}
 		case ast.Boolean:
 			return e.value ? object.TRUE : object.FALSE
 		case ast.Ident:
@@ -70,9 +74,9 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 			}
 			extended_env := object.env_extend(fn.env, context.temp_allocator)
 			for param, i in fn.parameters {
-				object.env_set(&extended_env, param.value, args[i])
+				object.env_set(extended_env, param.value, args[i])
 			}
-			evaluated := eval(ast.Node{ast.Stmt{fn.body^}}, &extended_env)
+			evaluated := eval(ast.Node{ast.Stmt{fn.body^}}, extended_env)
 			if rv, ok := evaluated.(object.Return_Value); ok {
 				return rv.value^
 			}
@@ -144,6 +148,21 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 					return l == r ? object.TRUE : object.FALSE
 				case "!=":
 					return l != r ? object.TRUE : object.FALSE
+				case:
+					return new_error(
+						"unknown operator: %s %s %s",
+						object.to_string(&left),
+						e.op,
+						object.to_string(&right),
+					)
+				}
+			case left_typeid == object.String && right_typeid == object.String:
+				l := left.(object.String).value
+				r := right.(object.String).value
+				switch e.op {
+				case "+":
+					s := strings.concatenate({l, r})
+					return object.String{s}
 				case:
 					return new_error(
 						"unknown operator: %s %s %s",

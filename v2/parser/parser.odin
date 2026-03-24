@@ -83,6 +83,7 @@ init :: proc(l: ^lexer.Lexer, allocator := context.allocator) -> ^Parser {
 	register_prefix(p, .Left_Paren, parse_grouped_expr)
 	register_prefix(p, .If, parse_if_expr)
 	register_prefix(p, .Function, parse_function_literal)
+	register_prefix(p, .String, parse_string_literal)
 
 	p.infix_parse_fns = make(type_of(p.infix_parse_fns), p.allocator)
 	register_infix(p, .Plus, parse_infix_expr)
@@ -238,6 +239,11 @@ parse_int :: proc(p: ^Parser) -> ast.Expr {
 	}
 	integer := ast.Integer_Literal{p.curr_tok, val}
 	return ast.Expr{integer}
+}
+
+parse_string_literal :: proc(p: ^Parser) -> ast.Expr {
+	s := ast.String_Literal{p.curr_tok, p.curr_tok.literal}
+	return ast.Expr{s}
 }
 
 parse_prefix_expr :: proc(p: ^Parser) -> ast.Expr {

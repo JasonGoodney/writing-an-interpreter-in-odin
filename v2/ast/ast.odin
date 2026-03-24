@@ -27,6 +27,7 @@ to_string :: proc {
 	if_expr_to_string,
 	function_literal_to_string,
 	call_expr_to_string,
+	string_literal_to_string,
 }
 
 // ======= Program =============================
@@ -124,6 +125,7 @@ Expr :: struct {
 		If_Expr,
 		Function_Literal,
 		Call_Expr,
+		String_Literal,
 	},
 }
 expr_to_string :: proc(expr: ^Expr) -> string {
@@ -143,6 +145,8 @@ expr_to_string :: proc(expr: ^Expr) -> string {
 	case Function_Literal:
 		return to_string(&v)
 	case Call_Expr:
+		return to_string(&v)
+	case String_Literal:
 		return to_string(&v)
 	case:
 		return fmt.tprintf("Unknown expression: %v", expr)
@@ -164,6 +168,15 @@ Integer_Literal :: struct {
 integer_literal_to_string :: proc(expr: ^Integer_Literal) -> string {
 	return expr.token.literal
 }
+
+String_Literal :: struct {
+	token: token.Token,
+	value: string,
+}
+string_literal_to_string :: proc(expr: ^String_Literal) -> string {
+	return expr.token.literal
+}
+
 Boolean :: struct {
 	token: token.Token,
 	value: bool,
@@ -267,3 +280,4 @@ call_expr_to_string :: proc(expr: ^Call_Expr) -> string {
 
 	return strings.clone(strings.to_string(sb), context.temp_allocator)
 }
+

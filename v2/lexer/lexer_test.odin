@@ -145,6 +145,9 @@ test_next_token_3 :: proc(t: ^testing.T) {
 	}
 	10 == 10;
 	10 != 9;
+	"foobar";
+	"foo bar";
+	"Hello, World";
 `
 
 	tests := []struct {
@@ -224,6 +227,12 @@ test_next_token_3 :: proc(t: ^testing.T) {
 		{.Not_Equal, "!="},
 		{.Int, "9"},
 		{.Semicolon, ";"},
+		{.String, "foobar"},
+		{.Semicolon, ";"},
+		{.String, "foo bar"},
+		{.Semicolon, ";"},
+		{.String, "Hello, World"},
+		{.Semicolon, ";"},
 		{.EOF, ""},
 	}
 
@@ -250,3 +259,4 @@ test_next_token_3 :: proc(t: ^testing.T) {
 
 	}
 }
+

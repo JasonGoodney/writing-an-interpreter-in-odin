@@ -13,6 +13,23 @@ expect :: proc(t: ^testing.T, ok: bool, format: string, args: ..any) -> bool {
 }
 
 @(test)
+test_string :: proc(t: ^testing.T) {
+	input := `"Hello, world!"`
+	evaluated := _test_eval(input)
+	str, ok := evaluated.(object.String)
+	expect(t, ok, "object is not String, got=%T (%v)", evaluated, evaluated)
+	expect(t, str.value == "Hello, world!", "String has wrong value. got=%s", str.value)
+}
+@(test)
+test_string_concatenate :: proc(t: ^testing.T) {
+	input := `"Hello" + "," + " " + "world" + "!"`
+	evaluated := _test_eval(input)
+	str, ok := evaluated.(object.String)
+	expect(t, ok, "object is not String, got=%T (%v)", evaluated, evaluated)
+	expect(t, str.value == "Hello, world!", "String has wrong value. got=%s", str.value)
+}
+
+@(test)
 test_eval_integer_expr :: proc(t: ^testing.T) {
 	tests := []struct {
 		input:    string,
@@ -198,6 +215,7 @@ test_error_handling :: proc(t: ^testing.T) {
 			"unknown operator: BOOLEAN + BOOLEAN",
 		},
 		{"foobar", "identifier not found: foobar"},
+		{`"Hello" - "World"`, "unknown operator: STRING - STRING"},
 	}
 
 	for tt in tests {
@@ -257,6 +275,30 @@ test_function_application :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_function_application_2 :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:    string,
+		expected: string,
+	} {
+		{
+			`
+			let makeGreeter = fn(greeting) { fn(name) { greeting + " " + name + "!" } };
+			let hello = makeGreeter("Hello");
+			hello("Jason");
+			`,
+			"Hello Jason!",
+		},
+	}
+
+	for tt in tests {
+		evaluated := _test_eval(tt.input)
+		str, ok := evaluated.(object.String)
+		expect(t, ok, "object is not String, got=%T (%v)", evaluated, evaluated)
+		expect(t, str.value == tt.expected, "String has wrong value. got=%s", str.value)
+	}
+}
+
 // ============== Helpers ===============================
 
 _test_eval :: proc(input: string) -> object.Object {
@@ -304,3 +346,4 @@ _test_null_object :: proc(t: ^testing.T, obj: object.Object) -> bool {
 		return expect(t, false, "object is not NULL. got=%T (%v)", obj, obj)
 	}
 }
+

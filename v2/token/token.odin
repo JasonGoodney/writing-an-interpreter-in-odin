@@ -6,6 +6,7 @@ Token_Type :: enum {
 	EOF,
 	Ident,
 	Int,
+	String,
 	Assign,
 	Bang,
 	Slash,
@@ -36,6 +37,7 @@ token_string_table := map[Token_Type]string {
 	.EOF         = "EOF",
 	.Ident       = "IDENT",
 	.Int         = "INT",
+	.String      = "STRING",
 	.Assign      = "=",
 	.Plus        = "+",
 	.Comma       = ",",
@@ -82,3 +84,4 @@ lookup_ident :: proc(ident: string) -> Token_Type {
 	}
 	return .Ident
 }
+

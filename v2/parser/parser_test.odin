@@ -146,6 +146,37 @@ test_integer_literal :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_string_literal :: proc(t: ^testing.T) {
+	alloc := context.temp_allocator
+
+	input := `"Hello, World";`
+	l := lexer.init(input, alloc)
+	p := parser.init(l, alloc)
+	prog := parse_program(p)
+	_check_parse_errors(t, p)
+
+	expect(t, len(prog.stmts) == 1, "program has not enough statements, got=`%d`", len(prog.stmts))
+	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
+	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
+	expr, expr_ok := stmt.expr.variant.(ast.String_Literal)
+	expect(t, expr_ok, "expr not String_Literal. got=`%T`", stmt.expr.variant)
+	expect(
+		t,
+		expr.value == "Hello, World",
+		"expr.value expected=`%d`. got=`%d`",
+		"Hello, World",
+		expr.value,
+	)
+	expect(
+		t,
+		expr.token.literal == "Hello, World",
+		"expr.token.literal not %s. got=`%s`",
+		"Hello, World",
+		expr.token.literal,
+	)
+}
+
+@(test)
 test_boolean :: proc(t: ^testing.T) {
 	alloc := context.temp_allocator
 
@@ -722,3 +753,4 @@ _check_parse_errors :: proc(t: ^testing.T, p: ^Parser) {
 
 	testing.fail_now(t)
 }
+
