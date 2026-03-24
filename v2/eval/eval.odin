@@ -25,12 +25,10 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 		case ast.Block_Stmt:
 			result: object.Object
 			for stmt in s.stmts {
-				result = eval(ast.Node{stmt^}, env)
-				if result != nil {
-					rt := object.get_typeid(&result)
-					if rt == object.Return_Value || rt == object.Error {
-						return result
-					}
+				result = eval(ast.Node{stmt}, env)
+				#partial switch v in result {
+				case object.Return_Value, object.Error:
+					return result
 				}
 			}
 			return result
@@ -55,6 +53,30 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 				return new_error("identifier not found: %s", e.value)
 			}
 			return val
+		case ast.Function_Literal:
+			params := e.parameters
+			body := e.body
+			return object.Function{parameters = params[:], body = body, env = env}
+		case ast.Call_Expr:
+			obj := eval(ast.Node{e.function^}, env)
+			if is_error(&obj) {return obj}
+			args := eval_expressions(e.arguments[:], env)
+			if len(args) == 1 && is_error(&args[0]) {
+				return args[0]
+			}
+			fn, ok := obj.(object.Function)
+			if !ok {
+				return new_error("not a function: %s", object.to_string(&obj))
+			}
+			extended_env := object.env_extend(fn.env, context.temp_allocator)
+			for param, i in fn.parameters {
+				object.env_set(&extended_env, param.value, args[i])
+			}
+			evaluated := eval(ast.Node{ast.Stmt{fn.body^}}, &extended_env)
+			if rv, ok := evaluated.(object.Return_Value); ok {
+				return rv.value^
+			}
+			return evaluated
 		case ast.Prefix_Expr:
 			right := eval(ast.Node{e.right^}, env)
 			if is_error(&right) {return right}
@@ -66,10 +88,10 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 				if integer, ok := right.(object.Integer); ok {
 					return object.Integer{value = -integer.value}
 				} else {
-					return new_error("unknown operator: %s%s", e.op, object.type_to_string(&right))
+					return new_error("unknown operator: %s%s", e.op, object.to_string(&right))
 				}
 			case:
-				return new_error("unknown operator: %s%s", e.op, object.type_to_string(&right))
+				return new_error("unknown operator: %s%s", e.op, object.to_string(&right))
 			}
 		case ast.Infix_Expr:
 			left := eval(ast.Node{e.left^}, env)
@@ -82,9 +104,9 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 			case left_typeid != right_typeid:
 				return new_error(
 					"type mismatch: %s %s %s",
-					object.type_to_string(&left),
+					object.to_string(&left),
 					e.op,
-					object.type_to_string(&right),
+					object.to_string(&right),
 				)
 			case left_typeid == object.Integer && right_typeid == object.Integer:
 				l := left.(object.Integer).value
@@ -109,9 +131,9 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 				case:
 					return new_error(
 						"unknown operator: %s %s %s",
-						object.type_to_string(&left),
+						object.to_string(&left),
 						e.op,
-						object.type_to_string(&right),
+						object.to_string(&right),
 					)
 				}
 			case left_typeid == object.Boolean && right_typeid == object.Boolean:
@@ -125,9 +147,9 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 				case:
 					return new_error(
 						"unknown operator: %s %s %s",
-						object.type_to_string(&left),
+						object.to_string(&left),
 						e.op,
-						object.type_to_string(&right),
+						object.to_string(&right),
 					)
 				}
 			case:
@@ -149,6 +171,19 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 	}
 
 	return {}
+}
+
+eval_expressions :: proc(exprs: []ast.Expr, env: ^object.Env) -> []object.Object {
+	result := make([dynamic]object.Object)
+	for expr in exprs {
+		evaluated := eval(ast.Node{expr}, env)
+		if is_error(&evaluated) {
+			result := []object.Object{evaluated}
+			return result
+		}
+		append(&result, evaluated)
+	}
+	return result[:]
 }
 
 is_truthy :: proc(obj: ^object.Object) -> bool {
@@ -175,3 +210,4 @@ is_error :: proc(obj: ^object.Object) -> bool {
 		return false
 	}
 }
+

@@ -214,6 +214,49 @@ test_error_handling :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_function_object :: proc(t: ^testing.T) {
+	input := "fn(x) { x + 2; }"
+	evaluated := _test_eval(input)
+	fn, ok := evaluated.(object.Function)
+	expect(t, ok, "object is not Function. got=%T (%v)", evaluated, evaluated)
+	expect(t, len(fn.parameters) == 1, "function has wrong parameters: %v", fn.parameters[:])
+	expect(
+		t,
+		ast.to_string(&fn.parameters[0]) == "x",
+		"parameter is not 'x', got=%v",
+		fn.parameters[0],
+	)
+	expected_body := "(x + 2)"
+	expect(
+		t,
+		ast.to_string(fn.body) == expected_body,
+		"body is not %s. got=%s",
+		expected_body,
+		ast.to_string(fn.body),
+	)
+}
+
+@(test)
+test_function_application :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:    string,
+		expected: i64,
+	} {
+		{"let identity = fn(x) { x; }; identity(5);", 5},
+		{"let identity = fn(x) { return x; }; identity(5);", 5},
+		{"let double = fn(x) { x * 2; }; double(5);", 10},
+		{"let add = fn(x, y) { x + y; }; add(5, 5);", 10},
+		{"let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20},
+		{"fn(x) { x; }(5)", 5},
+	}
+
+	for tt in tests {
+		evaluated := _test_eval(tt.input)
+		_test_integer_object(t, evaluated, tt.expected)
+	}
+}
+
 // ============== Helpers ===============================
 
 _test_eval :: proc(input: string) -> object.Object {
@@ -258,6 +301,6 @@ _test_null_object :: proc(t: ^testing.T, obj: object.Object) -> bool {
 	case object.Null:
 		return true
 	case:
-		return expect(t, obj != object.NULL, "object is not NULL. got=%T (%v)", obj, obj)
+		return expect(t, false, "object is not NULL. got=%T (%v)", obj, obj)
 	}
 }

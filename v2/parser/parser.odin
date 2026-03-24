@@ -192,16 +192,7 @@ parse_block_stmt :: proc(p: ^Parser) -> ast.Block_Stmt {
 	next_token(p)
 	for p.curr_tok.type != .Right_Brace && p.curr_tok.type != .EOF {
 		stmt := new_clone(parse_stmt(p), p.allocator)
-		switch &v in stmt.variant {
-		case ast.Let_Stmt:
-			append(&block.stmts, stmt)
-		case ast.Return_Stmt:
-			append(&block.stmts, stmt)
-		case ast.Expr_Stmt:
-			append(&block.stmts, stmt)
-		case ast.Block_Stmt:
-			append(&block.stmts, stmt)
-		}
+		append(&block.stmts, stmt^)
 		next_token(p)
 	}
 	return block
@@ -410,3 +401,4 @@ peek_error :: proc(p: ^Parser, type: token.Token_Type) {
 	)
 	append(&p.errors, msg)
 }
+

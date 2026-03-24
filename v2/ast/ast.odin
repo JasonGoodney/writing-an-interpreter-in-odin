@@ -103,12 +103,12 @@ expr_stmt_to_string :: proc(stmt: ^Expr_Stmt) -> string {
 
 Block_Stmt :: struct {
 	token: token.Token,
-	stmts: [dynamic]^Stmt,
+	stmts: [dynamic]Stmt,
 }
 block_stmt_to_string :: proc(stmt: ^Block_Stmt) -> string {
 	sb := strings.builder_make(context.temp_allocator)
-	for s in stmt.stmts {
-		strings.write_string(&sb, stmt_to_string(s))
+	for &s in stmt.stmts {
+		strings.write_string(&sb, stmt_to_string(&s))
 	}
 	return strings.clone(strings.to_string(sb), context.temp_allocator)
 }

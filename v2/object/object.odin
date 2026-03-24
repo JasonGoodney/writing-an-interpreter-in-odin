@@ -1,5 +1,6 @@
 package object
 
+import "../ast"
 import "core:fmt"
 import "core:strings"
 
@@ -25,12 +26,19 @@ Error :: struct {
 	message: string,
 }
 
+Function :: struct {
+	parameters: []ast.Ident,
+	body:       ^ast.Block_Stmt,
+	env:        ^Env,
+}
+
 Object :: union {
 	Integer,
 	Boolean,
 	Null,
 	Return_Value,
 	Error,
+	Function,
 }
 
 inspect :: proc(object: ^Object) -> string {
@@ -45,8 +53,22 @@ inspect :: proc(object: ^Object) -> string {
 		return inspect(v.value)
 	case Error:
 		return fmt.tprintf("ERROR: %s", v.message)
+	case Function:
+		sb := strings.builder_make()
+		defer strings.builder_destroy(&sb)
+		strings.write_string(&sb, "fn(")
+		if len(v.parameters) > 0 {
+			strings.write_string(&sb, ast.to_string(&v.parameters[0]))
+			for i := 1; i < len(v.parameters); i += 1 {
+				strings.write_string(&sb, ", ")
+				strings.write_string(&sb, ast.to_string(&v.parameters[i]))
+			}
+		}
+		strings.write_string(&sb, ast.to_string(v.body))
+		strings.write_string(&sb, "\n")
+		return strings.clone(strings.to_string(sb))
 	case:
-		return fmt.tprintf("Unknown object: %T", object)
+		return fmt.tprintf("Unknown object: %T", object^)
 	}
 }
 
@@ -62,12 +84,14 @@ get_typeid :: proc(obj: ^Object) -> typeid {
 		return Return_Value
 	case Error:
 		return Error
+	case Function:
+		return Function
 	}
 
 	return {}
 }
 
-type_to_string :: proc(obj: ^Object) -> string {
+to_string :: proc(obj: ^Object) -> string {
 	s := fmt.tprintf("%s", get_typeid(obj))
 	return strings.to_upper(s)
 }
