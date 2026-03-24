@@ -1,3 +1,5 @@
+#+ feature dynamic-literals
+
 package eval
 
 import "../ast"
@@ -5,6 +7,20 @@ import "../object"
 import "core:fmt"
 import "core:mem/virtual"
 import "core:strings"
+
+builtins := map[string]object.Builtin {
+	"len" = object.Builtin{fn = proc(args: ..object.Object) -> object.Object {
+			if len(args) != 1 {
+				return new_error("wrong number of arguments. got=%d, want=1")
+			}
+			#partial switch &v in args[0] {
+			case object.String:
+				return object.Integer{i64(len(v.value))}
+			case:
+				return new_error("arugment to `len` not supported, got %s", object.to_string(&v))
+			}
+		}},
+}
 
 eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 	switch n in node.variant {
@@ -21,7 +37,7 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 		}
 		return result
 	case ast.Stmt:
-		#partial switch s in n.variant {
+		switch s in n.variant {
 		case ast.Expr_Stmt:
 			return eval(ast.Node{s.expr}, env)
 		case ast.Block_Stmt:
@@ -44,7 +60,7 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 			object.env_set(env, s.name.value, val)
 		}
 	case ast.Expr:
-		#partial switch e in n.variant {
+		switch e in n.variant {
 		case ast.Integer_Literal:
 			return object.Integer{e.value}
 		case ast.String_Literal:
@@ -52,11 +68,9 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 		case ast.Boolean:
 			return e.value ? object.TRUE : object.FALSE
 		case ast.Ident:
-			val, ok := object.env_get(env, e.value)
-			if !ok {
-				return new_error("identifier not found: %s", e.value)
-			}
-			return val
+			if val, ok := object.env_get(env, e.value); ok {return val}
+			if builtin, ok := builtins[e.value]; ok {return builtin}
+			return new_error("identifier not found: %s", e.value)
 		case ast.Function_Literal:
 			params := e.parameters
 			body := e.body
@@ -68,19 +82,23 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 			if len(args) == 1 && is_error(&args[0]) {
 				return args[0]
 			}
-			fn, ok := obj.(object.Function)
-			if !ok {
+			#partial switch v in obj {
+			case object.Function:
+				fn := v
+				extended_env := object.env_extend(fn.env, context.temp_allocator)
+				for param, i in fn.parameters {
+					object.env_set(extended_env, param.value, args[i])
+				}
+				evaluated := eval(ast.Node{ast.Stmt{fn.body^}}, extended_env)
+				if rv, ok := evaluated.(object.Return_Value); ok {
+					return rv.value^
+				}
+				return evaluated
+			case object.Builtin:
+				return v.fn(..args)
+			case:
 				return new_error("not a function: %s", object.to_string(&obj))
 			}
-			extended_env := object.env_extend(fn.env, context.temp_allocator)
-			for param, i in fn.parameters {
-				object.env_set(extended_env, param.value, args[i])
-			}
-			evaluated := eval(ast.Node{ast.Stmt{fn.body^}}, extended_env)
-			if rv, ok := evaluated.(object.Return_Value); ok {
-				return rv.value^
-			}
-			return evaluated
 		case ast.Prefix_Expr:
 			right := eval(ast.Node{e.right^}, env)
 			if is_error(&right) {return right}

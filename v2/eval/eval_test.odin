@@ -4,6 +4,7 @@ import "../ast"
 import "../lexer"
 import "../object"
 import "../parser"
+import "core:strings"
 import "core:testing"
 
 expect :: proc(t: ^testing.T, ok: bool, format: string, args: ..any) -> bool {
@@ -296,6 +297,39 @@ test_function_application_2 :: proc(t: ^testing.T) {
 		str, ok := evaluated.(object.String)
 		expect(t, ok, "object is not String, got=%T (%v)", evaluated, evaluated)
 		expect(t, str.value == tt.expected, "String has wrong value. got=%s", str.value)
+	}
+}
+
+@(test)
+test_builtin_functions :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:    string,
+		expected: Expected_Value,
+	} {
+		{`len("")`, 0},
+		{`len("four")`, 4},
+		{`len("hello world")`, 11},
+		{`len(1)`, "argument to `len` not supported, got INTEGER"},
+		{`len("one", "two")`, "wrong number of arguments. got=2, want=1"},
+	}
+
+	for tt in tests {
+		evaluated := _test_eval(tt.input)
+		#partial switch v in tt.expected {
+		case i64:
+			_test_integer_object(t, evaluated, v)
+		case string:
+			errobj, ok := evaluated.(object.Error)
+			expect(t, ok, "object is not Error. got=%T (%v)", evaluated, evaluated)
+			if !ok {continue}
+			expect(
+				t,
+				errobj.message != v,
+				"wrong error message. expected=%s, got=%s",
+				v,
+				errobj.message,
+			)
+		}
 	}
 }
 
