@@ -329,6 +329,8 @@ test_operator_precedence_parsing :: proc(t: ^testing.T) {
 			"add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
 		},
 		{"add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g))"},
+		{"a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d)"},
+		{"add(a * b[2], b[1], 2 * [1, 2][1])", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))"},
 	}
 
 	for tt in tests {
@@ -598,6 +600,42 @@ test_call_expression_parameter_parsing :: proc(t: ^testing.T) {
 			s := ast.expr_to_string(&e)
 			expect(t, s == arg, "argument %d wrong. expected=%s, got=%s", arg, s)
 		}
+	}
+}
+
+@(test)
+test_array_literals :: proc(t: ^testing.T) {
+	input := "[1, 2 * 2, 3 + 3]"
+	l := lexer.init(input, context.temp_allocator)
+	p := parser.init(l, context.temp_allocator)
+	program := parser.parse_program(p)
+	_check_parse_errors(t, p)
+
+	stmt, ok := program.stmts[0].variant.(ast.Expr_Stmt)
+	arr, ok2 := stmt.expr.variant.(ast.Array_Literal)
+	expect(t, ok2, "expr not Array_Literal. got=%T", stmt.expr)
+	expect(t, len(arr.elements) == 3, "elements count not 3. got=%d", len(arr.elements))
+	_test_integer_literal(t, arr.elements[0], i64(1))
+	_test_infix_expression(t, arr.elements[1], i64(2), "*", i64(2))
+	_test_infix_expression(t, arr.elements[2], i64(3), "+", i64(3))
+}
+
+@(test)
+test_index_exprs :: proc(t: ^testing.T) {
+	input := "myArray[1 + 1]"
+	l := lexer.init(input, context.temp_allocator)
+	p := parser.init(l, context.temp_allocator)
+	program := parser.parse_program(p)
+	_check_parse_errors(t, p)
+
+	stmt, ok := program.stmts[0].variant.(ast.Expr_Stmt)
+	indexexpr, ok2 := stmt.expr.variant.(ast.Index_Expr)
+	expect(t, ok2, "expr not Index_Expr, got=%T", stmt.expr)
+	if !_test_identifier(t, indexexpr.left^, "myArray") {
+		return
+	}
+	if !_test_infix_expression(t, indexexpr.index^, i64(1), "+", i64(1)) {
+		return
 	}
 }
 

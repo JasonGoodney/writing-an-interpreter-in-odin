@@ -311,6 +311,16 @@ test_builtin_functions :: proc(t: ^testing.T) {
 		{`len("hello world")`, 11},
 		{`len(1)`, "argument to `len` not supported, got INTEGER"},
 		{`len("one", "two")`, "wrong number of arguments. got=2, want=1"},
+		{`len([])`, 0},
+		{`len([1,2,3])`, 3},
+		{`first([1,2,3])`, 1},
+		{`first(1)`, "argument to `first` not supported, got INTEGER"},
+		{`first([1,2,3], [4,5,6])`, "wrong number of arguments. got=2, want=1"},
+		{`first([])`, nil},
+		{`last([1,2,3])`, 3},
+		{`last(1)`, "argument to `last` not supported, got INTEGER"},
+		{`last([1,2,3], [4,5,6])`, "wrong number of arguments. got=2, want=1"},
+		{`last([])`, nil},
 	}
 
 	for tt in tests {
@@ -329,6 +339,47 @@ test_builtin_functions :: proc(t: ^testing.T) {
 				v,
 				errobj.message,
 			)
+		}
+	}
+}
+
+@(test)
+test_array_literals :: proc(t: ^testing.T) {
+	input := "[1, 2 * 2, 3 + 3]"
+	evaluated := _test_eval(input)
+	res, ok := evaluated.(object.Array)
+	expect(t, ok, "objeect is not Array. got=%T (%v)", evaluated, evaluated)
+	expect(t, len(res.elements) == 3, "array has wrong num of elements. got=%d", len(res.elements))
+	_test_integer_object(t, res.elements[0], i64(1))
+	_test_integer_object(t, res.elements[1], i64(4))
+	_test_integer_object(t, res.elements[2], i64(6))
+}
+
+@(test)
+test_array_index_expr :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:    string,
+		expected: Expected_Value,
+	} {
+		{"[1, 2, 3][0]", 1},
+		{"[1, 2, 3][1]", 2},
+		{"[1, 2, 3][2]", 3},
+		{"let i = 0; [1][i];", 1},
+		{"[1, 2, 3][1 + 1];", 3},
+		{"let myArray = [1, 2, 3]; myArray[2];", 3},
+		{"let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];", 6},
+		{"let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]", 2},
+		{"[1, 2, 3][3]", nil},
+		{"[1, 2, 3][-1]", nil},
+	}
+
+	for tt in tests {
+		e := _test_eval(tt.input)
+		#partial switch v in tt.expected {
+		case i64:
+			_test_integer_object(t, e, v)
+		case:
+			_test_null_object(t, e)
 		}
 	}
 }

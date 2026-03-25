@@ -28,6 +28,8 @@ to_string :: proc {
 	function_literal_to_string,
 	call_expr_to_string,
 	string_literal_to_string,
+	array_literal_to_string,
+	index_expr_to_string,
 }
 
 // ======= Program =============================
@@ -126,6 +128,8 @@ Expr :: struct {
 		Function_Literal,
 		Call_Expr,
 		String_Literal,
+		Array_Literal,
+		Index_Expr,
 	},
 }
 expr_to_string :: proc(expr: ^Expr) -> string {
@@ -147,6 +151,10 @@ expr_to_string :: proc(expr: ^Expr) -> string {
 	case Call_Expr:
 		return to_string(&v)
 	case String_Literal:
+		return to_string(&v)
+	case Array_Literal:
+		return to_string(&v)
+	case Index_Expr:
 		return to_string(&v)
 	case:
 		return fmt.tprintf("Unknown expression: %v", expr)
@@ -279,5 +287,38 @@ call_expr_to_string :: proc(expr: ^Call_Expr) -> string {
 	strings.write_string(&sb, ")")
 
 	return strings.clone(strings.to_string(sb), context.temp_allocator)
+}
+
+Array_Literal :: struct {
+	token:    token.Token,
+	elements: ^[dynamic]Expr,
+}
+array_literal_to_string :: proc(expr: ^Array_Literal) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	strings.write_string(&sb, "[")
+	if len(expr.elements) > 0 {
+		strings.write_string(&sb, to_string(&expr.elements[0]))
+		for i := 1; i < len(expr.elements); i += 1 {
+			strings.write_string(&sb, ", ")
+			strings.write_string(&sb, to_string(&expr.elements[i]))
+		}
+	}
+	strings.write_string(&sb, "]")
+	return strings.clone(strings.to_string(sb), context.temp_allocator)
+}
+
+Index_Expr :: struct {
+	token: token.Token,
+	left:  ^Expr,
+	index: ^Expr,
+}
+index_expr_to_string :: proc(expr: ^Index_Expr) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	strings.write_string(&sb, "(")
+	strings.write_string(&sb, to_string(expr.left))
+	strings.write_string(&sb, "[")
+	strings.write_string(&sb, to_string(expr.index))
+	strings.write_string(&sb, "])")
+	return strings.clone(strings.to_string(sb))
 }
 

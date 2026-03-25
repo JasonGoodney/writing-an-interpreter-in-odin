@@ -36,6 +36,10 @@ String :: struct {
 	value: string,
 }
 
+Array :: struct {
+	elements: []Object,
+}
+
 Builtin_Function :: proc(args: ..Object) -> Object
 Builtin :: struct {
 	fn: Builtin_Function,
@@ -50,6 +54,7 @@ Object :: union {
 	Function,
 	String,
 	Builtin,
+	Array,
 }
 
 inspect :: proc(object: ^Object) -> string {
@@ -82,6 +87,19 @@ inspect :: proc(object: ^Object) -> string {
 		return v.value
 	case Builtin:
 		return "builtin function"
+	case Array:
+		sb := strings.builder_make()
+		defer strings.builder_destroy(&sb)
+		strings.write_string(&sb, "[")
+		if len(v.elements) > 0 {
+			strings.write_string(&sb, inspect(&v.elements[0]))
+			for i := 1; i < len(v.elements); i += 1 {
+				strings.write_string(&sb, ", ")
+				strings.write_string(&sb, inspect(&v.elements[i]))
+			}
+		}
+		strings.write_string(&sb, "]")
+		return strings.clone(strings.to_string(sb))
 	case:
 		return fmt.tprintf("Unknown object: %T", object^)
 	}
@@ -105,6 +123,8 @@ get_typeid :: proc(obj: ^Object) -> typeid {
 		return String
 	case Builtin:
 		return Builtin
+	case Array:
+		return Array
 	}
 
 	return {}

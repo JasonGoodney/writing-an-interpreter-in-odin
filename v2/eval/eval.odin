@@ -13,11 +13,69 @@ builtins := map[string]object.Builtin {
 			if len(args) != 1 {
 				return new_error("wrong number of arguments. got=%d, want=1")
 			}
+			n := 0
 			#partial switch &v in args[0] {
 			case object.String:
-				return object.Integer{i64(len(v.value))}
+				n = len(v.value)
+			case object.Array:
+				n = len(v.elements)
 			case:
 				return new_error("arugment to `len` not supported, got %s", object.to_string(&v))
+			}
+			return object.Integer{i64(n)}
+		}},
+	"first" = object.Builtin{fn = proc(args: ..object.Object) -> object.Object {
+			if len(args) != 1 {
+				return new_error("wrong number of arguments. got=%d, want=1")
+			}
+			#partial switch &v in args[0] {
+			case object.Array:
+				if len(v.elements) == 0 {return object.NULL}
+				return v.elements[0]
+			case:
+				return new_error("arugment to `first` not supported, got %s", object.to_string(&v))
+			}
+		}},
+	"last" = object.Builtin{fn = proc(args: ..object.Object) -> object.Object {
+			if len(args) != 1 {
+				return new_error("wrong number of arguments. got=%d, want=1")
+			}
+			#partial switch &v in args[0] {
+			case object.Array:
+				if len(v.elements) == 0 {return object.NULL}
+				return v.elements[len(v.elements) - 1]
+			case:
+				return new_error("arugment to `last` not supported, got %s", object.to_string(&v))
+			}
+		}},
+	"rest" = object.Builtin{fn = proc(args: ..object.Object) -> object.Object {
+			if len(args) != 1 {
+				return new_error("wrong number of arguments. got=%d, want=1")
+			}
+			#partial switch &v in args[0] {
+			case object.Array:
+				length := len(v.elements)
+				if length == 0 {return object.NULL}
+				rest := make([dynamic]object.Object, length - 1, length - 1)
+				copy(rest[:], v.elements[1:])
+				return object.Array{rest[:]}
+			case:
+				return new_error("arugment to `rest` not supported, got %s", object.to_string(&v))
+			}
+		}},
+	"push" = object.Builtin{fn = proc(args: ..object.Object) -> object.Object {
+			if len(args) != 2 {
+				return new_error("wrong number of arguments. got=%d, want=2")
+			}
+			#partial switch &v in args[0] {
+			case object.Array:
+				length := len(v.elements)
+				rest := make([dynamic]object.Object, length + 1, length + 1)
+				copy(rest[:], v.elements[:])
+				rest[length] = args[1]
+				return object.Array{rest[:]}
+			case:
+				return new_error("arugment to `push` not supported, got %s", object.to_string(&v))
 			}
 		}},
 }
@@ -204,6 +262,31 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 			} else {
 				return object.NULL
 			}
+		case ast.Array_Literal:
+			elems := eval_expressions(e.elements[:], env)
+			if len(elems) == 1 && is_error(&elems[0]) {
+				return elems[0]
+			}
+			return object.Array{elems}
+		case ast.Index_Expr:
+			left := eval(ast.Node{e.left^}, env)
+			if is_error(&left) {return left}
+			index := eval(ast.Node{e.index^}, env)
+			if is_error(&index) {return index}
+			switch {
+			case object.get_typeid(&left) == object.Array &&
+			     object.get_typeid(&index) == object.Integer:
+				arr := left.(object.Array)
+				index := index.(object.Integer).value
+
+				if index < 0 || index >= i64(len(arr.elements)) {
+					return object.NULL
+				}
+				elem := arr.elements[index]
+				return elem
+			case:
+				return new_error("index operator not support: %s", object.get_typeid(&left))
+			}
 		}
 	}
 
@@ -211,7 +294,7 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 }
 
 eval_expressions :: proc(exprs: []ast.Expr, env: ^object.Env) -> []object.Object {
-	result := make([dynamic]object.Object)
+	result := make([dynamic]object.Object, env.allocator)
 	for expr in exprs {
 		evaluated := eval(ast.Node{expr}, env)
 		if is_error(&evaluated) {

@@ -8,8 +8,11 @@ import "../parser"
 import "core:bufio"
 import "core:fmt"
 import "core:io"
+import "core:os"
 
-start :: proc(reader: io.Reader, writer: io.Writer) {
+start :: proc(_in: ^os.File, _out: ^os.File) {
+	reader := os.to_reader(_in)
+	writer := os.to_writer(_out)
 	scanner := new(bufio.Scanner)
 	scanner = bufio.scanner_init(scanner, reader)
 	allocator := context.allocator
@@ -41,3 +44,4 @@ start :: proc(reader: io.Reader, writer: io.Writer) {
 		}
 	}
 }
+

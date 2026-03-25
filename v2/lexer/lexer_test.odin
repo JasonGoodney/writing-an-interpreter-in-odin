@@ -148,6 +148,7 @@ test_next_token_3 :: proc(t: ^testing.T) {
 	"foobar";
 	"foo bar";
 	"Hello, World";
+	[1, 2];
 `
 
 	tests := []struct {
@@ -232,6 +233,12 @@ test_next_token_3 :: proc(t: ^testing.T) {
 		{.String, "foo bar"},
 		{.Semicolon, ";"},
 		{.String, "Hello, World"},
+		{.Semicolon, ";"},
+		{.Left_Bracket, "["},
+		{.Int, "1"},
+		{.Comma, ","},
+		{.Int, "2"},
+		{.Right_Bracket, "]"},
 		{.Semicolon, ";"},
 		{.EOF, ""},
 	}

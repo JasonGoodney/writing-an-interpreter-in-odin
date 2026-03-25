@@ -21,18 +21,20 @@ Precedence :: enum {
 	Product,
 	Prefix,
 	Call,
+	Index,
 }
 
 precedence_table := map[token.Token_Type]Precedence {
-	.Equal      = .Equals,
-	.Not_Equal  = .Equals,
-	.Less       = .Less_Greater,
-	.Greater    = .Less_Greater,
-	.Plus       = .Sum,
-	.Minus      = .Sum,
-	.Slash      = .Product,
-	.Asterisk   = .Product,
-	.Left_Paren = .Call,
+	.Equal        = .Equals,
+	.Not_Equal    = .Equals,
+	.Less         = .Less_Greater,
+	.Greater      = .Less_Greater,
+	.Plus         = .Sum,
+	.Minus        = .Sum,
+	.Slash        = .Product,
+	.Asterisk     = .Product,
+	.Left_Paren   = .Call,
+	.Left_Bracket = .Index,
 }
 
 peek_precedence :: proc(p: ^Parser) -> Precedence {
@@ -84,6 +86,7 @@ init :: proc(l: ^lexer.Lexer, allocator := context.allocator) -> ^Parser {
 	register_prefix(p, .If, parse_if_expr)
 	register_prefix(p, .Function, parse_function_literal)
 	register_prefix(p, .String, parse_string_literal)
+	register_prefix(p, .Left_Bracket, parse_array)
 
 	p.infix_parse_fns = make(type_of(p.infix_parse_fns), p.allocator)
 	register_infix(p, .Plus, parse_infix_expr)
@@ -95,6 +98,7 @@ init :: proc(l: ^lexer.Lexer, allocator := context.allocator) -> ^Parser {
 	register_infix(p, .Equal, parse_infix_expr)
 	register_infix(p, .Not_Equal, parse_infix_expr)
 	register_infix(p, .Left_Paren, parse_call_expr)
+	register_infix(p, .Left_Bracket, parser_index_expr)
 
 	next_token(p)
 	next_token(p)
@@ -246,6 +250,36 @@ parse_string_literal :: proc(p: ^Parser) -> ast.Expr {
 	return ast.Expr{s}
 }
 
+parse_array :: proc(p: ^Parser) -> ast.Expr {
+	array := ast.Array_Literal {
+		token = p.curr_tok,
+	}
+	array.elements = parse_expr_list(p, .Right_Bracket)
+
+	return ast.Expr{array}
+}
+
+parse_expr_list :: proc(p: ^Parser, end: token.Token_Type) -> ^[dynamic]ast.Expr {
+	elems := new([dynamic]ast.Expr, p.allocator)
+	if p.peek_tok.type == end {
+		next_token(p)
+		return elems
+	}
+	next_token(p)
+	elem := new_clone(parse_expr(p, .Lowest), p.allocator)
+	append(elems, elem^)
+	for p.peek_tok.type == .Comma {
+		next_token(p)
+		next_token(p)
+		elem := new_clone(parse_expr(p, .Lowest), p.allocator)
+		append(elems, elem^)
+	}
+	if !expect_peek(p, end) {
+		return {}
+	}
+	return elems
+}
+
 parse_prefix_expr :: proc(p: ^Parser) -> ast.Expr {
 	prefix_expr := ast.Prefix_Expr {
 		token = p.curr_tok,
@@ -364,28 +398,22 @@ parse_call_expr :: proc(p: ^Parser, function: ^ast.Expr) -> ast.Expr {
 		token    = p.curr_tok,
 		function = new_clone(function^, p.allocator),
 	}
-	callexpr.arguments = parse_call_arguments(p)
+	callexpr.arguments = parse_expr_list(p, .Right_Paren)
 	return ast.Expr{callexpr}
 }
 
-parse_call_arguments :: proc(p: ^Parser) -> ^[dynamic]ast.Expr {
-	args := new([dynamic]ast.Expr, p.allocator)
-	if p.peek_tok.type == .Right_Paren {
-		next_token(p)
-		return args
+parser_index_expr :: proc(p: ^Parser, left: ^ast.Expr) -> ast.Expr {
+	index_expr := ast.Index_Expr {
+		token = p.curr_tok,
+		left  = new_clone(left^, p.allocator),
 	}
 	next_token(p)
-	append(args, parse_expr(p, .Lowest))
-	for p.peek_tok.type == .Comma {
-		next_token(p)
-		next_token(p)
-		append(args, parse_expr(p, .Lowest))
-	}
-
-	if !expect_peek(p, .Right_Paren) {
+	index_expr.index = new_clone(parse_expr(p, .Lowest), p.allocator)
+	if !expect_peek(p, .Right_Bracket) {
 		return {}
 	}
-	return args
+
+	return ast.Expr{index_expr}
 }
 
 expect_peek :: proc(p: ^Parser, type: token.Token_Type) -> bool {
