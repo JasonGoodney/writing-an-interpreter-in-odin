@@ -217,6 +217,7 @@ test_error_handling :: proc(t: ^testing.T) {
 		},
 		{"foobar", "identifier not found: foobar"},
 		{`"Hello" - "World"`, "unknown operator: STRING - STRING"},
+		{`{"name": "Monkey"}[fn(x) { x }];`, "unusable as hash key: FUNCTION"},
 	}
 
 	for tt in tests {
@@ -371,6 +372,67 @@ test_array_index_expr :: proc(t: ^testing.T) {
 		{"let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]", 2},
 		{"[1, 2, 3][3]", nil},
 		{"[1, 2, 3][-1]", nil},
+	}
+
+	for tt in tests {
+		e := _test_eval(tt.input)
+		#partial switch v in tt.expected {
+		case i64:
+			_test_integer_object(t, e, v)
+		case:
+			_test_null_object(t, e)
+		}
+	}
+}
+
+@(test)
+test_hash_literals :: proc(t: ^testing.T) {
+	input := `let two = "two";
+	{
+		"one": 10 - 9,
+		two: 1 + 1,
+		"thr" + "ee": 6 / 2,
+		4: 4,
+		true: 5,
+		false: 6
+	}`
+	eval := _test_eval(input)
+	res, ok := eval.(object.Hash)
+	expect(t, ok, "eval did not return Hash. got=%T (%v)", eval, eval)
+	expected := make(map[object.Hash_Key]i64, context.temp_allocator)
+	expected[object.hash_key(&object.String{value = "one"})] = 1
+	expected[object.hash_key(&object.String{value = "two"})] = 2
+	expected[object.hash_key(&object.String{value = "three"})] = 3
+	expected[object.hash_key(&object.Integer{value = 4})] = 4
+	expected[object.hash_key(&object.Boolean{value = true})] = 5
+	expected[object.hash_key(&object.Boolean{value = false})] = 6
+
+	expect(
+		t,
+		len(res.pairs) == len(expected),
+		"hash has wrong number of pairs. got=%T",
+		len(res.pairs),
+	)
+	for ekey, eval in expected {
+		pair, ok := res.pairs[ekey]
+		expect(t, ok, "no pair for given key: %v", ekey)
+		_test_integer_object(t, pair.val, eval)
+	}
+}
+
+@(test)
+test_hash_index_expr :: proc(t: ^testing.T) {
+	tests := []struct {
+		input:    string,
+		expected: Expected_Value,
+	} {
+		{`{"foo": 5}["foo"]`, 5},
+		{`{"foo": 5}["bar"]`, nil},
+		{`let key = "foo"; {"foo": 5}[key]`, 5},
+		{`{}["foo"]`, nil},
+		{`{5: 5}[5]`, 5},
+		{`{true: 5}[true]`, 5},
+		{`{false: 5}[false]`, 5},
 	}
 
 	for tt in tests {

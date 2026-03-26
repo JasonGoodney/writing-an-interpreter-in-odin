@@ -273,9 +273,10 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 			if is_error(&left) {return left}
 			index := eval(ast.Node{e.index^}, env)
 			if is_error(&index) {return index}
+			left_type := object.get_typeid(&left)
+			index_type := object.get_typeid(&index)
 			switch {
-			case object.get_typeid(&left) == object.Array &&
-			     object.get_typeid(&index) == object.Integer:
+			case left_type == object.Array && index_type == object.Integer:
 				arr := left.(object.Array)
 				index := index.(object.Integer).value
 
@@ -284,9 +285,34 @@ eval :: proc(node: ast.Node, env: ^object.Env) -> object.Object {
 				}
 				elem := arr.elements[index]
 				return elem
+			case left_type == object.Hash:
+				hashobj := left.(object.Hash)
+				key := object.hash_key(&index)
+				if key == {} {
+					return new_error("unusable as hash key: %s", object.to_string(&index))
+				}
+				pair, ok := hashobj.pairs[key]
+				if !ok {return object.NULL}
+				return pair.val
 			case:
 				return new_error("index operator not support: %s", object.get_typeid(&left))
 			}
+		case ast.Hash_Literal:
+			pairs := make(map[object.Hash_Key]object.Hash_Pair, env.allocator)
+			for key_node, val_node in e.pairs {
+				key := eval(ast.Node{key_node^}, env)
+				if is_error(&key) {return key}
+
+				hash_key := object.hash_key(&key)
+				if hash_key == {} {
+					return new_error("unusable as hash key: %s", object.to_string(&key))
+				}
+				val := eval(ast.Node{val_node}, env)
+				if is_error(&val) {return val}
+
+				pairs[hash_key] = object.Hash_Pair{hash_key, val}
+			}
+			return object.Hash{pairs = pairs}
 		}
 	}
 
