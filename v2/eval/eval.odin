@@ -5,7 +5,6 @@ package eval
 import "../ast"
 import "../object"
 import "core:fmt"
-import "core:mem/virtual"
 import "core:strings"
 
 builtins := map[string]object.Builtin {
@@ -77,6 +76,13 @@ builtins := map[string]object.Builtin {
 			case:
 				return new_error("arugment to `push` not supported, got %s", object.to_string(&v))
 			}
+		}},
+	"puts" = object.Builtin{fn = proc(args: ..object.Object) -> object.Object {
+			for &arg in args {
+				str := object.inspect(&arg)
+				fmt.println(str)
+			}
+			return object.NULL
 		}},
 }
 
