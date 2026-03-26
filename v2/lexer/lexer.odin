@@ -49,6 +49,8 @@ next_token :: proc(l: ^Lexer) -> token.Token {
 		tok = new_token(.Right_Bracket, l.ch)
 	case ';':
 		tok = new_token(.Semicolon, l.ch)
+	case ':':
+		tok = new_token(.Colon, l.ch)
 	case '(':
 		tok = new_token(.Left_Paren, l.ch)
 	case ')':

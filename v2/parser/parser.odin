@@ -87,6 +87,7 @@ init :: proc(l: ^lexer.Lexer, allocator := context.allocator) -> ^Parser {
 	register_prefix(p, .Function, parse_function_literal)
 	register_prefix(p, .String, parse_string_literal)
 	register_prefix(p, .Left_Bracket, parse_array)
+	register_prefix(p, .Left_Brace, parse_hash_literal)
 
 	p.infix_parse_fns = make(type_of(p.infix_parse_fns), p.allocator)
 	register_infix(p, .Plus, parse_infix_expr)
@@ -257,6 +258,34 @@ parse_array :: proc(p: ^Parser) -> ast.Expr {
 	array.elements = parse_expr_list(p, .Right_Bracket)
 
 	return ast.Expr{array}
+}
+
+parse_hash_literal :: proc(p: ^Parser) -> ast.Expr {
+	hash := ast.Hash_Literal {
+		token = p.curr_tok,
+	}
+	pairs := make(map[^ast.Expr]ast.Expr, p.allocator)
+
+	for p.peek_tok.type != .Right_Brace {
+		next_token(p)
+		key := parse_expr(p, .Lowest)
+		if !expect_peek(p, .Colon) {
+			return {}
+		}
+		next_token(p)
+		val := parse_expr(p, .Lowest)
+		pairs[&key] = val
+
+		if p.peek_tok.type != .Right_Brace && !expect_peek(p, .Comma) {
+			return {}
+		}
+	}
+	if !expect_peek(p, .Right_Brace) {
+		return {}
+	}
+	hash.pairs = new_clone(pairs, p.allocator)
+
+	return ast.Expr{hash}
 }
 
 parse_expr_list :: proc(p: ^Parser, end: token.Token_Type) -> ^[dynamic]ast.Expr {

@@ -30,6 +30,7 @@ to_string :: proc {
 	string_literal_to_string,
 	array_literal_to_string,
 	index_expr_to_string,
+	hash_literal_to_string,
 }
 
 // ======= Program =============================
@@ -130,6 +131,7 @@ Expr :: struct {
 		String_Literal,
 		Array_Literal,
 		Index_Expr,
+		Hash_Literal,
 	},
 }
 expr_to_string :: proc(expr: ^Expr) -> string {
@@ -155,6 +157,8 @@ expr_to_string :: proc(expr: ^Expr) -> string {
 	case Array_Literal:
 		return to_string(&v)
 	case Index_Expr:
+		return to_string(&v)
+	case Hash_Literal:
 		return to_string(&v)
 	case:
 		return fmt.tprintf("Unknown expression: %v", expr)
@@ -319,6 +323,37 @@ index_expr_to_string :: proc(expr: ^Index_Expr) -> string {
 	strings.write_string(&sb, "[")
 	strings.write_string(&sb, to_string(expr.index))
 	strings.write_string(&sb, "])")
+	return strings.clone(strings.to_string(sb))
+}
+
+Hash_Literal :: struct {
+	token: token.Token,
+	// keys:  ^[dynamic]Expr,
+	// vals:  ^[dynamic]Expr,
+	pairs: ^map[^Expr]Expr,
+}
+
+hash_literal_to_string :: proc(expr: ^Hash_Literal) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	strings.write_string(&sb, "{")
+
+	pairs := make([dynamic]string, context.temp_allocator)
+	// for &k, i in expr.keys {
+	// 	key := expr_to_string(&k)
+	// 	val := expr_to_string(&expr.vals[i])
+	// 	str := strings.concatenate({key, ":", val}, context.temp_allocator)
+	// 	append(&pairs, str)
+	// }
+
+	for k, &v in expr.pairs {
+		key := expr_to_string(k)
+		val := expr_to_string(&v)
+		str := strings.concatenate({key, ":", val}, context.temp_allocator)
+		append(&pairs, str)
+	}
+
+	strings.write_string(&sb, strings.join(pairs[:], ", ", context.temp_allocator))
+	strings.write_string(&sb, "}")
 	return strings.clone(strings.to_string(sb))
 }
 

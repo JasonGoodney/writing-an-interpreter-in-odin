@@ -10,7 +10,7 @@ import "core:testing"
 
 expect :: proc(t: ^testing.T, ok: bool, format: string, args: ..any) -> bool {
 	result := testing.expectf(t, ok, format, ..args)
-	assert(result)
+	// assert(result)
 	return result
 }
 
@@ -639,6 +639,94 @@ test_index_exprs :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_parsing_hash_literals_string_keys :: proc(t: ^testing.T) {
+	input := `{"one": 1, "two": 2, "three": 3}`
+
+	l := lexer.init(input)
+	p := parser.init(l)
+	program := parser.parse_program(p)
+	_check_parse_errors(t, p)
+
+	stmt := program.stmts[0].variant.(ast.Expr_Stmt)
+	hash, ok := stmt.expr.variant.(ast.Hash_Literal)
+	expect(t, ok, "expr is not Hash_Literal. got=%T", stmt.expr)
+	expect(t, len(hash.pairs) == 3, "hash.pairs is wrong length. got=%d", len(hash.pairs))
+
+	expected := make(map[string]i64)
+	expected["one"] = 1
+	expected["two"] = 2
+	expected["three"] = 3
+
+	for key, val in hash.pairs {
+		lit, ok := key.variant.(ast.String_Literal)
+		expect(t, ok, "key is not String_Literal. got=%T", key)
+		expected_value := expected[ast.string_literal_to_string(&lit)]
+		_test_integer_literal(t, val, expected_value)
+	}
+}
+
+@(test)
+test_parsing_hash_literals_expressions :: proc(t: ^testing.T) {
+	input := `{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}`
+
+	l := lexer.init(input)
+	p := parser.init(l)
+	program := parser.parse_program(p)
+	_check_parse_errors(t, p)
+
+	stmt := program.stmts[0].variant.(ast.Expr_Stmt)
+	hash, ok := stmt.expr.variant.(ast.Hash_Literal)
+	expect(t, ok, "expr is not Hash_Literal. got=%T", stmt.expr)
+	expect(t, len(hash.pairs) == 3, "hash.pairs is wrong length. got=%d", len(hash.pairs))
+
+	expected := make(map[string]proc(t: ^testing.T, e: ast.Expr))
+	expected["one"] = proc(t: ^testing.T, e: ast.Expr) {_test_infix_expression(
+			t,
+			e,
+			i64(0),
+			"+",
+			i64(1),
+		)}
+	expected["two"] = proc(t: ^testing.T, e: ast.Expr) {_test_infix_expression(
+			t,
+			e,
+			i64(10),
+			"-",
+			i64(8),
+		)}
+	expected["three"] = proc(t: ^testing.T, e: ast.Expr) {_test_infix_expression(
+			t,
+			e,
+			i64(15),
+			"/",
+			i64(5),
+		)}
+
+	for k, val in hash.pairs {
+		lit, ok := k.variant.(ast.String_Literal)
+		expect(t, ok, "key is not String_Literal. got=%T", k)
+		test_func := expected[ast.string_literal_to_string(&lit)]
+		test_func(t, val)
+	}
+}
+
+@(test)
+test_parsing_hash_literals_empty :: proc(t: ^testing.T) {
+	input := `{}`
+
+	l := lexer.init(input)
+	p := parser.init(l)
+	program := parser.parse_program(p)
+	_check_parse_errors(t, p)
+
+	stmt := program.stmts[0].variant.(ast.Expr_Stmt)
+	hash, ok := stmt.expr.variant.(ast.Hash_Literal)
+	expect(t, ok, "expr is not Hash_Literal. got=%T", stmt.expr)
+	expect(t, len(hash.pairs) == 0, "hash.pairs is wrong length. got=%d", len(hash.pairs))
+}
+
+
 //
 // ========= Helpers ==========================
 //
@@ -791,4 +879,3 @@ _check_parse_errors :: proc(t: ^testing.T, p: ^Parser) {
 
 	testing.fail_now(t)
 }
-
