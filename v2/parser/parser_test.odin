@@ -38,17 +38,16 @@ test_let_statements :: proc(t: ^testing.T) {
 
 		expect(
 			t,
-			len(prog.stmts) == 1,
+			len(prog.program_stmts) == 1,
 			"program.statements does not contain 1 statements. got=%d",
-			len(prog.stmts),
+			len(prog.program_stmts),
 		)
-		stmt := prog.stmts[0]
+		stmt := prog.program_stmts[0]
 		if !_test_let_statement(t, stmt, tt.expected_ident) {
 			testing.fail_now(t)
 		}
 
-		value := stmt.variant.(ast.Let_Stmt).value
-		if !_test_literal_expression(t, value, tt.expected_value) {
+		if !_test_literal_expression(t, stmt.let_stmt_val, tt.expected_value) {
 			return
 		}
 	}
@@ -731,18 +730,22 @@ test_parsing_hash_literals_empty :: proc(t: ^testing.T) {
 // ========= Helpers ==========================
 //
 
-_test_let_statement :: proc(t: ^testing.T, s: ast.Stmt, name: string) -> bool {
-	letstmt, ok := s.variant.(ast.Let_Stmt)
-	expect(t, ok, "s not Let_Stmt. got=%T", s.variant)
-	if !ok {return false}
+_test_let_statement :: proc(t: ^testing.T, n: ast.Node, name: string) -> bool {
+	expect(t, n.kind == .Let_Stmt, "n not Let_Stmt. got=%T", n.kind) or_return
+	expect(
+		t,
+		n.let_stmt_name.kind == .Ident,
+		"n.let_stmt_name not Ident. got=%T",
+		n.let_stmt_name.kind,
+	) or_return
 
 	expect(
 		t,
-		letstmt.name.value == name,
+		n.let_stmt_name.ident_val == name,
 		"letstmt.name.value expected=%s, got=%s",
 		name,
 		letstmt.name.value,
-	)
+	) or_return
 
 	expect(
 		t,
@@ -750,7 +753,7 @@ _test_let_statement :: proc(t: ^testing.T, s: ast.Stmt, name: string) -> bool {
 		"letstmt.name.token.literal expected=%s, got=%s",
 		name,
 		letstmt.name.token.literal,
-	)
+	) or_return
 
 	return true
 }
