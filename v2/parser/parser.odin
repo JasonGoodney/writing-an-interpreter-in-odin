@@ -268,13 +268,13 @@ parse_hash_literal :: proc(p: ^Parser) -> ast.Expr {
 
 	for p.peek_tok.type != .Right_Brace {
 		next_token(p)
-		key := parse_expr(p, .Lowest)
+		key := new_clone(parse_expr(p, .Lowest), p.allocator)
 		if !expect_peek(p, .Colon) {
 			return {}
 		}
 		next_token(p)
 		val := parse_expr(p, .Lowest)
-		pairs[&key] = val
+		pairs[key] = val
 
 		if p.peek_tok.type != .Right_Brace && !expect_peek(p, .Comma) {
 			return {}
@@ -464,4 +464,3 @@ peek_error :: proc(p: ^Parser, type: token.Token_Type) {
 	)
 	append(&p.errors, msg)
 }
-
