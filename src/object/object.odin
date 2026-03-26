@@ -3,6 +3,7 @@ package object
 import "../ast"
 import "core:fmt"
 import "core:hash/xxhash"
+import "core:strconv"
 import "core:strings"
 
 TRUE :: Boolean{true}
@@ -74,14 +75,7 @@ hash_string :: proc(s: ^String) -> Hash_Key {
 	hash: u64 = xxhash.XXH3_64(buf)
 	return Hash_Key{String, hash}
 }
-hashable :: proc(o: ^Object) -> bool {
-	#partial switch v in o {
-	case Boolean, Integer, String:
-		return true
-	case:
-		return false
-	}
-}
+
 Hash_Pair :: struct {
 	key: Hash_Key,
 	val: Object,
@@ -107,67 +101,67 @@ Object :: union {
 	Array,
 	Hash,
 }
+inspect :: proc(object: ^Object, allocator := context.allocator) -> string {
+	sb := strings.builder_make(allocator)
+	defer strings.builder_destroy(&sb)
+	write_object(&sb, object)
+	s := strings.to_string(sb)
+	return strings.clone(s, allocator)
+}
 
-inspect :: proc(object: ^Object) -> string {
+write_string :: strings.write_string
+write_object :: proc(sb: ^strings.Builder, object: ^Object) {
 	switch v in object {
 	case Integer:
-		return fmt.tprintf("%d", v.value)
+		strings.write_i64(sb, v.value)
 	case Boolean:
-		return fmt.tprintf("%t", v.value)
+		write_string(sb, v.value ? "true" : "false")
 	case Null:
-		return "null"
+		write_string(sb, "null")
 	case Return_Value:
-		return inspect(v.value)
+		write_object(sb, v.value)
 	case Error:
-		return fmt.tprintf("ERROR: %s", v.message)
+		write_string(sb, "ERROR: ")
+		write_string(sb, v.message)
 	case Function:
-		sb := strings.builder_make()
-		defer strings.builder_destroy(&sb)
-		strings.write_string(&sb, "fn(")
-		if len(v.parameters) > 0 {
-			strings.write_string(&sb, ast.to_string(v.parameters[0]))
-			for i := 1; i < len(v.parameters); i += 1 {
-				strings.write_string(&sb, ", ")
-				strings.write_string(&sb, ast.to_string(v.parameters[i]))
-			}
+		write_string(sb, "fn(")
+		delim := false
+		for param in v.parameters {
+			if delim {write_string(sb, ",")}
+			delim = true
+			write_string(sb, ast.to_string(param))
 		}
-		strings.write_string(&sb, ast.to_string(v.body))
-		strings.write_string(&sb, "\n")
-		return strings.clone(strings.to_string(sb))
+		write_string(sb, ast.to_string(v.body))
+		write_string(sb, "\n")
 	case String:
-		return v.value
+		write_string(sb, v.value)
 	case Builtin:
-		return "builtin function"
+		write_string(sb, "builtin function")
 	case Array:
-		sb := strings.builder_make()
-		defer strings.builder_destroy(&sb)
-		strings.write_string(&sb, "[")
-		if len(v.elements) > 0 {
-			strings.write_string(&sb, inspect(&v.elements[0]))
-			for i := 1; i < len(v.elements); i += 1 {
-				strings.write_string(&sb, ", ")
-				strings.write_string(&sb, inspect(&v.elements[i]))
-			}
+		write_string(sb, "[")
+		delim := false
+		for &elem in v.elements {
+			if delim {write_string(sb, ", ")}
+			delim = true
+			write_string(sb, inspect(&elem))
 		}
-		strings.write_string(&sb, "]")
-		return strings.clone(strings.to_string(sb))
+		write_string(sb, "]")
+
 	case Hash:
-		sb := strings.builder_make()
-		defer strings.builder_destroy(&sb)
-		strings.write_string(&sb, "{")
+		write_string(sb, "{")
 		delim := false
 		for k, &v in v.pairs {
 			if delim {
-				strings.write_string(&sb, ", ")
+				write_string(sb, ", ")
 			}
-			strings.write_string(&sb, inspect(&v.val))
+			write_string(sb, inspect(&v.val))
 			delim = true
 		}
-		strings.write_string(&sb, "}")
-		return strings.clone(strings.to_string(sb))
+		write_string(sb, "}")
 
 	case:
-		return fmt.tprintf("Unknown object: %T", object^)
+		write_string(sb, "Unknown object: ")
+		write_string(sb, to_string(object))
 	}
 }
 
