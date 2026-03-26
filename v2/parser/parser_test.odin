@@ -10,7 +10,7 @@ import "core:testing"
 
 expect :: proc(t: ^testing.T, ok: bool, format: string, args: ..any) -> bool {
 	result := testing.expectf(t, ok, format, ..args)
-	// assert(result)
+	assert(result)
 	return result
 }
 
@@ -38,16 +38,18 @@ test_let_statements :: proc(t: ^testing.T) {
 
 		expect(
 			t,
-			len(prog.program_stmts) == 1,
+			len(prog.stmts) == 1,
 			"program.statements does not contain 1 statements. got=%d",
-			len(prog.program_stmts),
+			len(prog.stmts),
 		)
-		stmt := prog.program_stmts[0]
+
+		stmt := prog.stmts[0]
 		if !_test_let_statement(t, stmt, tt.expected_ident) {
 			testing.fail_now(t)
 		}
 
-		if !_test_literal_expression(t, stmt.let_stmt_val, tt.expected_value) {
+		value := stmt.derived.(^ast.Let_Stmt).value
+		if !_test_literal_expression(t, value, tt.expected_value) {
 			return
 		}
 	}
@@ -76,7 +78,7 @@ test_return_statements :: proc(t: ^testing.T) {
 		)
 
 		stmt := program.stmts[0]
-		returnStmt, ok := stmt.variant.(ast.Return_Stmt)
+		returnStmt, ok := stmt.derived.(^ast.Return_Stmt)
 		expect(t, ok, "stmt not *ast.returnStatement. got=%T", stmt)
 		expect(
 			t,
@@ -100,15 +102,15 @@ test_ident :: proc(t: ^testing.T) {
 	_check_parse_errors(t, p)
 
 	expect(t, len(prog.stmts) == 1, "program has not enough statements, got=`%d`", len(prog.stmts))
-	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
+	stmt, ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
 	expect(
 		t,
 		ok,
 		"prog.statements[0] is not Expression_Statement. got=`%T`",
-		prog.stmts[0].variant,
+		prog.stmts[0].derived,
 	)
-	ident, ident_ok := stmt.expr.variant.(ast.Ident)
-	expect(t, ident_ok, "expr not Identifier. got=`%T`", stmt.expr.variant)
+	ident, ident_ok := stmt.expr.derived.(^ast.Ident)
+	expect(t, ident_ok, "expr not Identifier. got=`%T`", stmt.expr.derived)
 	expect(t, ident.value == "foobar", "ident.value not %s. got=`%s`", "foobar", ident.value)
 	expect(
 		t,
@@ -130,10 +132,10 @@ test_integer_literal :: proc(t: ^testing.T) {
 	_check_parse_errors(t, p)
 
 	expect(t, len(prog.stmts) == 1, "program has not enough statements, got=`%d`", len(prog.stmts))
-	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
-	expr, expr_ok := stmt.expr.variant.(ast.Integer_Literal)
-	expect(t, expr_ok, "expr not Integer_Literal. got=`%T`", stmt.expr.variant)
+	stmt, ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
+	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].derived)
+	expr, expr_ok := stmt.expr.derived.(^ast.Integer_Literal)
+	expect(t, expr_ok, "expr not Integer_Literal. got=`%T`", stmt.expr.derived)
 	expect(t, expr.value == 5, "expr.value expected=`%d`. got=`%d`", 5, expr.value)
 	expect(
 		t,
@@ -155,10 +157,10 @@ test_string_literal :: proc(t: ^testing.T) {
 	_check_parse_errors(t, p)
 
 	expect(t, len(prog.stmts) == 1, "program has not enough statements, got=`%d`", len(prog.stmts))
-	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
-	expr, expr_ok := stmt.expr.variant.(ast.String_Literal)
-	expect(t, expr_ok, "expr not String_Literal. got=`%T`", stmt.expr.variant)
+	stmt, ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
+	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].derived)
+	expr, expr_ok := stmt.expr.derived.(^ast.String_Literal)
+	expect(t, expr_ok, "expr not String_Literal. got=`%T`", stmt.expr.derived)
 	expect(
 		t,
 		expr.value == "Hello, World",
@@ -186,10 +188,10 @@ test_boolean :: proc(t: ^testing.T) {
 	_check_parse_errors(t, p)
 
 	expect(t, len(prog.stmts) == 1, "program has not enough statements, got=`%d`", len(prog.stmts))
-	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
-	expr, expr_ok := stmt.expr.variant.(ast.Boolean)
-	expect(t, expr_ok, "expr not Boolean. got=`%T`", stmt.expr.variant)
+	stmt, ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
+	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].derived)
+	expr, expr_ok := stmt.expr.derived.(^ast.Boolean)
+	expect(t, expr_ok, "expr not Boolean. got=`%T`", stmt.expr.derived)
 	expect(t, expr.value == true, "expr.value expected=`%d`. got=`%d`", true, expr.value)
 	expect(
 		t,
@@ -229,13 +231,13 @@ test_prefix_expressions :: proc(t: ^testing.T) {
 			"program has not wrong statements, got=`%d`",
 			len(prog.stmts),
 		)
-		stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-		expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
-		expr, expr_ok := stmt.expr.variant.(ast.Prefix_Expr)
-		expect(t, expr_ok, "expr not Prefix_Expression. got=`%T`", stmt.expr.variant)
+		stmt, ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
+		expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].derived)
+		expr, expr_ok := stmt.expr.derived.(^ast.Prefix_Expr)
+		expect(t, expr_ok, "expr not Prefix_Expression. got=`%T`", stmt.expr.derived)
 		expect(t, expr.op == tt.op, "expr.op expected=`%s`. got=`%s`", tt.op, expr.op)
 
-		if !_test_literal_expression(t, expr.right^, tt.value) {
+		if !_test_literal_expression(t, expr.right, tt.value) {
 			testing.fail_now(t)
 		}
 	}
@@ -284,8 +286,8 @@ test_infix_expressions :: proc(t: ^testing.T) {
 			"program has not enough statements, got=`%d`",
 			len(prog.stmts),
 		)
-		stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-		expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
+		stmt, ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
+		expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].derived)
 
 		if !_test_infix_expression(t, stmt.expr, tt.left_val, tt.op, tt.right_val) {
 			return
@@ -340,7 +342,7 @@ test_operator_precedence_parsing :: proc(t: ^testing.T) {
 		prog := parse_program(p)
 		_check_parse_errors(t, p)
 
-		actual := ast.to_string(&prog)
+		actual := ast.to_string(prog, alloc)
 		expect(t, actual == tt.expected, "expected=`%s`, got=`%s`", tt.expected, actual)
 	}
 }
@@ -358,13 +360,13 @@ test_if_expression :: proc(t: ^testing.T) {
 
 
 	expect(t, len(prog.stmts) == 1, "program has not enough statements, got=`%d`", len(prog.stmts))
-	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
+	stmt, ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
+	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].derived)
 
-	ifexpr, if_ok := stmt.expr.variant.(ast.If_Expr)
-	expect(t, ok, "stmt.expr is not If_Expression. got=%T", stmt.expr.variant)
+	ifexpr, if_ok := stmt.expr.derived.(^ast.If_Expr)
+	expect(t, ok, "stmt.expr is not If_Expression. got=%T", stmt.expr.derived)
 
-	if !_test_infix_expression(t, ifexpr.condition^, "x", "<", "y") {
+	if !_test_infix_expression(t, ifexpr.condition, "x", "<", "y") {
 		return
 	}
 
@@ -375,8 +377,8 @@ test_if_expression :: proc(t: ^testing.T) {
 		len(ifexpr.consequence.stmts),
 	)
 
-	conseq, conseq_ok := ifexpr.consequence.stmts[0].variant.(ast.Expr_Stmt)
-	expect(t, ok, "statements[0] not ast.Expr_Stmt. got=%T", ifexpr.consequence.stmts[0].variant)
+	conseq, conseq_ok := ifexpr.consequence.stmts[0].derived.(^ast.Expr_Stmt)
+	expect(t, ok, "statements[0] not ast.Expr_Stmt. got=%T", ifexpr.consequence.stmts[0].derived)
 
 	if !_test_identifier(t, conseq.expr, "x") {
 		return
@@ -398,13 +400,13 @@ test_if_else_expression :: proc(t: ^testing.T) {
 
 
 	expect(t, len(prog.stmts) == 1, "program has not enough statements, got=`%d`", len(prog.stmts))
-	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
+	stmt, ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
+	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].derived)
 
-	ifexpr, if_ok := stmt.expr.variant.(ast.If_Expr)
-	expect(t, ok, "stmt.expr is not If_Expression. got=%T", stmt.expr.variant)
+	ifexpr, if_ok := stmt.expr.derived.(^ast.If_Expr)
+	expect(t, ok, "stmt.expr is not If_Expression. got=%T", stmt.expr.derived)
 
-	if !_test_infix_expression(t, ifexpr.condition^, "x", "<", "y") {
+	if !_test_infix_expression(t, ifexpr.condition, "x", "<", "y") {
 		return
 	}
 
@@ -415,20 +417,20 @@ test_if_else_expression :: proc(t: ^testing.T) {
 		len(ifexpr.consequence.stmts),
 	)
 
-	conseq, conseq_ok := ifexpr.consequence.stmts[0].variant.(ast.Expr_Stmt)
+	conseq, conseq_ok := ifexpr.consequence.stmts[0].derived.(^ast.Expr_Stmt)
 	expect(
 		t,
 		ok,
 		"consequence.stmts[0] not ast.Expr_Stmt. got=%T",
-		ifexpr.consequence.stmts[0].variant,
+		ifexpr.consequence.stmts[0].derived,
 	)
 
 	if !_test_identifier(t, conseq.expr, "x") {
 		return
 	}
 
-	alt, alt_ok := ifexpr.alternative.stmts[0].variant.(ast.Expr_Stmt)
-	expect(t, ok, "alt.stmts[0] not ast.Expr_Stmt. got=%T", ifexpr.alternative.stmts[0].variant)
+	alt, alt_ok := ifexpr.alternative.stmts[0].derived.(^ast.Expr_Stmt)
+	expect(t, ok, "alt.stmts[0] not ast.Expr_Stmt. got=%T", ifexpr.alternative.stmts[0].derived)
 
 	if !_test_identifier(t, alt.expr, "y") {
 		return
@@ -448,11 +450,11 @@ test_function_literal :: proc(t: ^testing.T) {
 
 
 	expect(t, len(prog.stmts) == 1, "program has not enough statements, got=`%d`", len(prog.stmts))
-	stmt, ok := prog.stmts[0].variant.(ast.Expr_Stmt)
-	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].variant)
+	stmt, ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
+	expect(t, ok, "prog.stmts[0] is not ast.Expr_Stmt. got=`%T`", prog.stmts[0].derived)
 
-	fnexpr, if_ok := stmt.expr.variant.(ast.Function_Literal)
-	expect(t, ok, "stmt.expr is not Function_Literal. got=%T", stmt.expr.variant)
+	fnexpr, if_ok := stmt.expr.derived.(^ast.Function_Literal)
+	expect(t, ok, "stmt.expr is not Function_Literal. got=%T", stmt.expr.derived)
 
 	expect(
 		t,
@@ -461,8 +463,8 @@ test_function_literal :: proc(t: ^testing.T) {
 		len(fnexpr.parameters),
 	)
 
-	_test_literal_expression(t, ast.Expr{fnexpr.parameters[0]}, "x")
-	_test_literal_expression(t, ast.Expr{fnexpr.parameters[1]}, "y")
+	_test_literal_expression(t, fnexpr.parameters[0], "x")
+	_test_literal_expression(t, fnexpr.parameters[1], "y")
 
 	expect(
 		t,
@@ -471,12 +473,12 @@ test_function_literal :: proc(t: ^testing.T) {
 		len(fnexpr.body.stmts),
 	)
 
-	bodystmt, body_ok := fnexpr.body.stmts[0].variant.(ast.Expr_Stmt)
+	bodystmt, body_ok := fnexpr.body.stmts[0].derived.(^ast.Expr_Stmt)
 	expect(
 		t,
 		body_ok,
 		"fn body stmt is not Expression_Satement. got=%T",
-		fnexpr.body.stmts[0].variant.(ast.Expr_Stmt),
+		fnexpr.body.stmts[0].derived.(^ast.Expr_Stmt),
 	)
 
 	_test_infix_expression(t, bodystmt.expr, "x", "+", "y")
@@ -501,8 +503,8 @@ test_function_parameter_parsing :: proc(t: ^testing.T) {
 		prog := parse_program(p)
 		_check_parse_errors(t, p)
 
-		stmt := prog.stmts[0].variant.(ast.Expr_Stmt)
-		fn := stmt.expr.variant.(ast.Function_Literal)
+		stmt := prog.stmts[0].derived.(^ast.Expr_Stmt)
+		fn := stmt.expr.derived.(^ast.Function_Literal)
 
 		expect(
 			t,
@@ -513,7 +515,7 @@ test_function_parameter_parsing :: proc(t: ^testing.T) {
 		)
 
 		for ident, i in tt.expected_params {
-			_test_literal_expression(t, ast.Expr{fn.parameters[i]}, ident)
+			_test_literal_expression(t, fn.parameters[i], ident)
 		}
 	}
 }
@@ -537,14 +539,14 @@ test_call_expression_parsing :: proc(t: ^testing.T) {
 		len(prog.stmts),
 	)
 
-	stmt, stmt_ok := prog.stmts[0].variant.(ast.Expr_Stmt)
+	stmt, stmt_ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
 	expect(t, stmt_ok, "stmt is not ast.Expr_Stmt. got=%T", prog.stmts[0])
 
-	expr, expr_ok := stmt.expr.variant.(ast.Call_Expr)
+	expr, expr_ok := stmt.expr.derived.(^ast.Call_Expr)
 	expect(t, expr_ok, "stmt.expr not Call_Expression. got=%T", stmt.expr)
 
 
-	if !_test_identifier(t, expr.function^, "add") {
+	if !_test_identifier(t, expr.function, "add") {
 		return
 	}
 
@@ -576,13 +578,13 @@ test_call_expression_parameter_parsing :: proc(t: ^testing.T) {
 		_check_parse_errors(t, p)
 
 
-		stmt, stmt_ok := prog.stmts[0].variant.(ast.Expr_Stmt)
+		stmt, stmt_ok := prog.stmts[0].derived.(^ast.Expr_Stmt)
 		expect(t, stmt_ok, "stmt is not ast.Expr_Stmt. got=%T", prog.stmts[0])
 
-		expr, expr_ok := stmt.expr.variant.(ast.Call_Expr)
+		expr, expr_ok := stmt.expr.derived.(^ast.Call_Expr)
 		expect(t, expr_ok, "stmt.expr not Call_Expression. got=%T", stmt.expr)
 
-		if !_test_identifier(t, expr.function^, "add") {
+		if !_test_identifier(t, expr.function, "add") {
 			return
 		}
 
@@ -596,7 +598,7 @@ test_call_expression_parameter_parsing :: proc(t: ^testing.T) {
 
 		for arg, i in tt.expectedArgs {
 			e := expr.arguments[i]
-			s := ast.expr_to_string(&e)
+			s := ast.to_string(e, alloc)
 			expect(t, s == arg, "argument %d wrong. expected=%s, got=%s", arg, s)
 		}
 	}
@@ -610,8 +612,8 @@ test_array_literals :: proc(t: ^testing.T) {
 	program := parser.parse_program(p)
 	_check_parse_errors(t, p)
 
-	stmt, ok := program.stmts[0].variant.(ast.Expr_Stmt)
-	arr, ok2 := stmt.expr.variant.(ast.Array_Literal)
+	stmt, ok := program.stmts[0].derived.(^ast.Expr_Stmt)
+	arr, ok2 := stmt.expr.derived.(^ast.Array_Literal)
 	expect(t, ok2, "expr not Array_Literal. got=%T", stmt.expr)
 	expect(t, len(arr.elements) == 3, "elements count not 3. got=%d", len(arr.elements))
 	_test_integer_literal(t, arr.elements[0], i64(1))
@@ -627,13 +629,13 @@ test_index_exprs :: proc(t: ^testing.T) {
 	program := parser.parse_program(p)
 	_check_parse_errors(t, p)
 
-	stmt, ok := program.stmts[0].variant.(ast.Expr_Stmt)
-	indexexpr, ok2 := stmt.expr.variant.(ast.Index_Expr)
+	stmt, ok := program.stmts[0].derived.(^ast.Expr_Stmt)
+	indexexpr, ok2 := stmt.expr.derived.(^ast.Index_Expr)
 	expect(t, ok2, "expr not Index_Expr, got=%T", stmt.expr)
-	if !_test_identifier(t, indexexpr.left^, "myArray") {
+	if !_test_identifier(t, indexexpr.left, "myArray") {
 		return
 	}
-	if !_test_infix_expression(t, indexexpr.index^, i64(1), "+", i64(1)) {
+	if !_test_infix_expression(t, indexexpr.index, i64(1), "+", i64(1)) {
 		return
 	}
 }
@@ -647,8 +649,8 @@ test_parsing_hash_literals_string_keys :: proc(t: ^testing.T) {
 	program := parser.parse_program(p)
 	_check_parse_errors(t, p)
 
-	stmt := program.stmts[0].variant.(ast.Expr_Stmt)
-	hash, ok := stmt.expr.variant.(ast.Hash_Literal)
+	stmt := program.stmts[0].derived.(^ast.Expr_Stmt)
+	hash, ok := stmt.expr.derived.(^ast.Hash_Literal)
 	expect(t, ok, "expr is not Hash_Literal. got=%T", stmt.expr)
 	expect(t, len(hash.pairs) == 3, "hash.pairs is wrong length. got=%d", len(hash.pairs))
 
@@ -658,9 +660,10 @@ test_parsing_hash_literals_string_keys :: proc(t: ^testing.T) {
 	expected["three"] = 3
 
 	for key, val in hash.pairs {
-		lit, ok := key.variant.(ast.String_Literal)
+		lit, ok := key.derived.(^ast.String_Literal)
 		expect(t, ok, "key is not String_Literal. got=%T", key)
-		expected_value := expected[ast.string_literal_to_string(&lit)]
+		key := ast.to_string(lit, context.temp_allocator)
+		expected_value := expected[key]
 		_test_integer_literal(t, val, expected_value)
 	}
 }
@@ -674,27 +677,28 @@ test_parsing_hash_literals_expressions :: proc(t: ^testing.T) {
 	program := parser.parse_program(p)
 	_check_parse_errors(t, p)
 
-	stmt := program.stmts[0].variant.(ast.Expr_Stmt)
-	hash, ok := stmt.expr.variant.(ast.Hash_Literal)
+	stmt := program.stmts[0].derived.(^ast.Expr_Stmt)
+	hash, ok := stmt.expr.derived.(^ast.Hash_Literal)
 	expect(t, ok, "expr is not Hash_Literal. got=%T", stmt.expr)
 	expect(t, len(hash.pairs) == 3, "hash.pairs is wrong length. got=%d", len(hash.pairs))
 
-	expected := make(map[string]proc(t: ^testing.T, e: ast.Expr))
-	expected["one"] = proc(t: ^testing.T, e: ast.Expr) {_test_infix_expression(
+
+	expected := make(map[string]proc(t: ^testing.T, e: ^ast.Expr))
+	expected["one"] = proc(t: ^testing.T, e: ^ast.Expr) {_test_infix_expression(
 			t,
 			e,
 			i64(0),
 			"+",
 			i64(1),
 		)}
-	expected["two"] = proc(t: ^testing.T, e: ast.Expr) {_test_infix_expression(
+	expected["two"] = proc(t: ^testing.T, e: ^ast.Expr) {_test_infix_expression(
 			t,
 			e,
 			i64(10),
 			"-",
 			i64(8),
 		)}
-	expected["three"] = proc(t: ^testing.T, e: ast.Expr) {_test_infix_expression(
+	expected["three"] = proc(t: ^testing.T, e: ^ast.Expr) {_test_infix_expression(
 			t,
 			e,
 			i64(15),
@@ -703,9 +707,10 @@ test_parsing_hash_literals_expressions :: proc(t: ^testing.T) {
 		)}
 
 	for k, val in hash.pairs {
-		lit, ok := k^.variant.(ast.String_Literal)
+		lit, ok := k^.derived.(^ast.String_Literal)
 		expect(t, ok, "key is not String_Literal. got=%T", k^)
-		test_func := expected[ast.string_literal_to_string(&lit)]
+		key := ast.to_string(lit, context.temp_allocator)
+		test_func := expected[key]
 		test_func(t, val)
 	}
 }
@@ -719,8 +724,8 @@ test_parsing_hash_literals_empty :: proc(t: ^testing.T) {
 	program := parser.parse_program(p)
 	_check_parse_errors(t, p)
 
-	stmt := program.stmts[0].variant.(ast.Expr_Stmt)
-	hash, ok := stmt.expr.variant.(ast.Hash_Literal)
+	stmt := program.stmts[0].derived.(^ast.Expr_Stmt)
+	hash, ok := stmt.expr.derived.(^ast.Hash_Literal)
 	expect(t, ok, "expr is not Hash_Literal. got=%T", stmt.expr)
 	expect(t, len(hash.pairs) == 0, "hash.pairs is wrong length. got=%d", len(hash.pairs))
 }
@@ -730,35 +735,34 @@ test_parsing_hash_literals_empty :: proc(t: ^testing.T) {
 // ========= Helpers ==========================
 //
 
-_test_let_statement :: proc(t: ^testing.T, n: ast.Node, name: string) -> bool {
-	expect(t, n.kind == .Let_Stmt, "n not Let_Stmt. got=%T", n.kind) or_return
-	expect(
-		t,
-		n.let_stmt_name.kind == .Ident,
-		"n.let_stmt_name not Ident. got=%T",
-		n.let_stmt_name.kind,
-	) or_return
+_test_let_statement :: proc(t: ^testing.T, n: ^ast.Stmt, name: string) -> bool {
+	ls, ok := n.derived_stmt.(^ast.Let_Stmt)
+	expect(t, ok, "n not Let_Stmt. got=%T", n) or_return
 
 	expect(
 		t,
-		n.let_stmt_name.ident_val == name,
+		ls.name.value == name,
 		"letstmt.name.value expected=%s, got=%s",
 		name,
-		letstmt.name.value,
+		ls.name.value,
 	) or_return
 
 	expect(
 		t,
-		letstmt.name.token.literal == name,
+		ls.name.token.literal == name,
 		"letstmt.name.token.literal expected=%s, got=%s",
 		name,
-		letstmt.name.token.literal,
+		ls.name.token.literal,
 	) or_return
 
 	return true
 }
 
-_test_literal_expression :: proc(t: ^testing.T, expr: ast.Expr, expected: Expected_Value) -> bool {
+_test_literal_expression :: proc(
+	t: ^testing.T,
+	expr: ^ast.Expr,
+	expected: Expected_Value,
+) -> bool {
 	switch ev in expected {
 	case i64:
 		return _test_integer_literal(t, expr, ev)
@@ -772,9 +776,9 @@ _test_literal_expression :: proc(t: ^testing.T, expr: ast.Expr, expected: Expect
 	return false
 }
 
-_test_boolean :: proc(t: ^testing.T, expr: ast.Expr, value: bool) -> bool {
-	b, ok := expr.variant.(ast.Boolean)
-	expect(t, ok, "expr not Boolean. got=%T", expr.variant)
+_test_boolean :: proc(t: ^testing.T, expr: ^ast.Expr, value: bool) -> bool {
+	b, ok := expr.derived_expr.(^ast.Boolean)
+	expect(t, ok, "expr not Boolean. got=%T", expr)
 	if !ok {return false}
 
 	expect(t, b.value == value, "b.value not %t. got=%t", value, b.value)
@@ -794,13 +798,13 @@ _test_boolean :: proc(t: ^testing.T, expr: ast.Expr, value: bool) -> bool {
 
 _test_integer_literal :: proc(
 	t: ^testing.T,
-	expr: ast.Expr,
+	expr: ^ast.Expr,
 	val: i64,
 	alloc := context.allocator,
 ) -> bool {
 
-	il, il_ok := expr.variant.(ast.Integer_Literal)
-	expect(t, il_ok, "expr not Integer_Literal. got=`%T`", expr.variant)
+	il, il_ok := expr.derived_expr.(^ast.Integer_Literal)
+	expect(t, il_ok, "expr not Integer_Literal. got=`%T`", expr)
 	if !il_ok {
 		return false
 	}
@@ -823,8 +827,8 @@ _test_integer_literal :: proc(
 	return true
 }
 
-_test_identifier :: proc(t: ^testing.T, expr: ast.Expr, value: string) -> bool {
-	ident, ok := expr.variant.(ast.Ident)
+_test_identifier :: proc(t: ^testing.T, expr: ^ast.Expr, value: string) -> bool {
+	ident, ok := expr.derived_expr.(^ast.Ident)
 	expect(t, ok, "expr not Identifier, got=`%T`", expr)
 	if !ok {return false}
 
@@ -845,23 +849,23 @@ _test_identifier :: proc(t: ^testing.T, expr: ast.Expr, value: string) -> bool {
 
 _test_infix_expression :: proc(
 	t: ^testing.T,
-	expr: ast.Expr,
+	expr: ^ast.Expr,
 	left: $T,
 	op: string,
 	right: $U,
 ) -> bool {
-	opexpr, ok := expr.variant.(ast.Infix_Expr)
+	opexpr, ok := expr.derived_expr.(^ast.Infix_Expr)
 	expect(t, ok, "expr is not Infix_Expression. got=`%T`", expr)
 	if !ok {return false}
 
-	if !_test_literal_expression(t, opexpr.left^, left) {
+	if !_test_literal_expression(t, opexpr.left, left) {
 		return false
 	}
 
 	expect(t, opexpr.op == op, "expr operator is not `%s`. got=`%s`", op, opexpr.op)
 	if opexpr.op != op {return false}
 
-	if !_test_literal_expression(t, opexpr.right^, right) {
+	if !_test_literal_expression(t, opexpr.right, right) {
 		return false
 	}
 

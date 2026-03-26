@@ -243,7 +243,7 @@ test_function_object :: proc(t: ^testing.T) {
 	expect(t, len(fn.parameters) == 1, "function has wrong parameters: %v", fn.parameters[:])
 	expect(
 		t,
-		ast.to_string(&fn.parameters[0]) == "x",
+		ast.to_string(fn.parameters[0]) == "x",
 		"parameter is not 'x', got=%v",
 		fn.parameters[0],
 	)
@@ -453,7 +453,7 @@ _test_eval :: proc(input: string) -> object.Object {
 	p := parser.init(l, context.temp_allocator)
 	program := parser.parse_program(p)
 	env := object.env_init()
-	obj := eval(ast.Node{program}, &env)
+	obj := eval(program, &env)
 	return obj
 }
 
@@ -493,4 +493,3 @@ _test_null_object :: proc(t: ^testing.T, obj: object.Object) -> bool {
 		return expect(t, false, "object is not NULL. got=%T (%v)", obj, obj)
 	}
 }
-

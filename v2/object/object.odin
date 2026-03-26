@@ -28,7 +28,7 @@ Error :: struct {
 }
 
 Function :: struct {
-	parameters: []ast.Ident,
+	parameters: []^ast.Ident,
 	body:       ^ast.Block_Stmt,
 	env:        ^Env,
 }
@@ -125,10 +125,10 @@ inspect :: proc(object: ^Object) -> string {
 		defer strings.builder_destroy(&sb)
 		strings.write_string(&sb, "fn(")
 		if len(v.parameters) > 0 {
-			strings.write_string(&sb, ast.to_string(&v.parameters[0]))
+			strings.write_string(&sb, ast.to_string(v.parameters[0]))
 			for i := 1; i < len(v.parameters); i += 1 {
 				strings.write_string(&sb, ", ")
-				strings.write_string(&sb, ast.to_string(&v.parameters[i]))
+				strings.write_string(&sb, ast.to_string(v.parameters[i]))
 			}
 		}
 		strings.write_string(&sb, ast.to_string(v.body))
@@ -202,4 +202,3 @@ to_string :: proc(obj: ^Object) -> string {
 	s := fmt.tprintf("%s", get_typeid(obj))
 	return strings.to_upper(s)
 }
-

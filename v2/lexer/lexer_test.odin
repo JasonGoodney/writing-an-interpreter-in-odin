@@ -272,4 +272,3 @@ test_next_token_3 :: proc(t: ^testing.T) {
 
 	}
 }
-

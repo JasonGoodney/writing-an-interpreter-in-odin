@@ -18,7 +18,7 @@ exec :: proc(input: string) {
 		fmt.println(p.errors)
 	}
 	// Evaluate the input
-	obj := eval.eval(ast.Node{program}, &env)
+	obj := eval.eval(program, &env)
 	fmt.printfln("{}", object.inspect(&obj))
 }
 
@@ -35,4 +35,3 @@ main :: proc() {
 		exec(string(input))
 	}
 }
-

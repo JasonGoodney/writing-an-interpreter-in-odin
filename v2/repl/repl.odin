@@ -36,7 +36,7 @@ start :: proc(_in: ^os.File, _out: ^os.File) {
 			}
 		}
 
-		evaluated := eval.eval(ast.Node{program}, &env)
+		evaluated := eval.eval(program, &env)
 
 		if object.get_typeid(&evaluated) != {} {
 			io.write_string(writer, object.inspect(&evaluated))
@@ -44,4 +44,3 @@ start :: proc(_in: ^os.File, _out: ^os.File) {
 		}
 	}
 }
-

@@ -7,11 +7,10 @@ import "../lexer"
 import "../token"
 import "base:runtime"
 import "core:fmt"
-import "core:log"
 import "core:strconv"
 
-prefix_parse_fn :: proc(p: ^Parser) -> ^ast.Node
-infix_parse_fn :: proc(p: ^Parser, left: ^ast.Node) -> ^ast.Node
+prefix_parse_fn :: proc(p: ^Parser) -> ^ast.Expr
+infix_parse_fn :: proc(p: ^Parser, left: ^ast.Expr) -> ^ast.Expr
 
 Precedence :: enum {
 	Lowest,
@@ -77,7 +76,7 @@ init :: proc(l: ^lexer.Lexer, allocator := context.allocator) -> ^Parser {
 
 	p.prefix_parse_fns = make(type_of(p.prefix_parse_fns), p.allocator)
 	register_prefix(p, .Ident, parse_ident)
-	register_prefix(p, .Int, parse_int)
+	register_prefix(p, .Int, parse_integer_literal)
 	register_prefix(p, .Bang, parse_prefix_expr)
 	register_prefix(p, .Minus, parse_prefix_expr)
 	register_prefix(p, .True, parse_boolean)
@@ -86,7 +85,7 @@ init :: proc(l: ^lexer.Lexer, allocator := context.allocator) -> ^Parser {
 	register_prefix(p, .If, parse_if_expr)
 	register_prefix(p, .Function, parse_function_literal)
 	register_prefix(p, .String, parse_string_literal)
-	register_prefix(p, .Left_Bracket, parse_array)
+	register_prefix(p, .Left_Bracket, parse_array_literal)
 	register_prefix(p, .Left_Brace, parse_hash_literal)
 
 	p.infix_parse_fns = make(type_of(p.infix_parse_fns), p.allocator)
@@ -107,21 +106,20 @@ init :: proc(l: ^lexer.Lexer, allocator := context.allocator) -> ^Parser {
 	return p
 }
 
-parse_program :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Program
+parse_program :: proc(p: ^Parser) -> ^ast.Program {
+	program := ast.new(ast.Program, p.allocator)
 
-	stmts := make([dynamic]ast.Node, p.allocator)
+	stmts := make([dynamic]^ast.Stmt, p.allocator)
 	for p.curr_tok.type != .EOF {
 		stmt := parse_stmt(p)
-		#partial switch stmt.kind {
-		case .Let_Stmt, .Ret_Stmt, .Expr_Stmt, .Block_Stmt:
-			append(&stmts, stmt^)
+		#partial switch v in stmt.derived_stmt {
+		case ^ast.Let_Stmt, ^ast.Return_Stmt, ^ast.Expr_Stmt, ^ast.Block_Stmt:
+			append(&stmts, stmt)
 		}
 		next_token(p)
 	}
-	node.program_stmts = stmts[:]
-	return node
+	program.stmts = stmts[:]
+	return program
 }
 
 next_token :: proc(p: ^Parser) {
@@ -129,7 +127,7 @@ next_token :: proc(p: ^Parser) {
 	p.peek_tok = lexer.next_token(p.lexer)
 }
 
-parse_stmt :: proc(p: ^Parser) -> ^ast.Node {
+parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	#partial switch p.curr_tok.type {
 	case .Let:
 		return parse_let_stmt(p)
@@ -140,72 +138,65 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Node {
 	}
 }
 
-parse_let_stmt :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Let_Stmt
-	node.token = p.curr_tok
+parse_let_stmt :: proc(p: ^Parser) -> ^ast.Let_Stmt {
+	ls := ast.new(ast.Let_Stmt, p.curr_tok, p.allocator)
 
 	if !expect_peek(p, .Ident) {
 		return {}
 	}
 
-	node.let_stmt_name = &ast.Node {
-		kind = .Ident,
-		token = p.curr_tok,
-		ident_val = p.curr_tok.literal,
-	}
+	name := ast.new(ast.Ident, p.curr_tok, p.allocator)
+	name.value = p.curr_tok.literal
+	ls.name = name
 
 	if !expect_peek(p, .Assign) {
 		return {}
 	}
 	next_token(p)
-	node.let_stmt_val = parse_expr(p, .Lowest)
+
+	ls.value = parse_expr(p, .Lowest)
 	if p.peek_tok.type == .Semicolon {
 		next_token(p)
 	}
 
-	return node
+	return ls
 }
 
-parse_return_stmt :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Ret_Stmt
-	node.token = p.curr_tok
+parse_return_stmt :: proc(p: ^Parser) -> ^ast.Return_Stmt {
+	rs := ast.new(ast.Return_Stmt, p.curr_tok, p.allocator)
 
 	next_token(p)
-	node.ret_stmt_val = parse_expr(p, .Lowest)
+	rs.return_value = parse_expr(p, .Lowest)
 	if p.peek_tok.type == .Semicolon {
 		next_token(p)
 	}
-	return node
+	return rs
 }
 
-parse_expr_stmt :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Expr_Stmt
-	node.token = p.curr_tok
+parse_expr_stmt :: proc(p: ^Parser) -> ^ast.Expr_Stmt {
+	es := ast.new(ast.Expr_Stmt, p.curr_tok, p.allocator)
 
-	node.expr_stmt_expr = parse_expr(p, .Lowest)
+	es.expr = parse_expr(p, .Lowest)
 	if p.peek_tok.type == .Semicolon {
 		next_token(p)
 	}
-	return node
+	return es
 }
 
-parse_block_stmt :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Block_Stmt
-	node.token = p.curr_tok
+parse_block_stmt :: proc(p: ^Parser) -> ^ast.Block_Stmt {
+	bs := ast.new(ast.Block_Stmt, p.curr_tok, p.allocator)
 
 	next_token(p)
 
-	stmts := make([dynamic]ast.Node, p.allocator)
+	stmts := make([dynamic]^ast.Stmt, p.allocator)
 	for p.curr_tok.type != .Right_Brace && p.curr_tok.type != .EOF {
 		stmt := parse_stmt(p)
-		append(&stmts, stmt^)
+		append(&stmts, stmt)
 		next_token(p)
 	}
-	return block
+
+	bs.stmts = stmts[:]
+	return bs
 }
 
 // =========== Expressions ==============================
@@ -215,7 +206,7 @@ parser_error :: proc(p: ^Parser, format: string, args: ..any) {
 	append(&p.errors, msg)
 }
 
-parse_expr :: proc(p: ^Parser, prec: Precedence) -> ^ast.Node {
+parse_expr :: proc(p: ^Parser, prec: Precedence) -> ^ast.Expr {
 	prefix := p.prefix_parse_fns[p.curr_tok.type]
 	if prefix == nil {
 		parser_error(p, "no prefix parse fn for %s found", p.curr_tok.literal)
@@ -235,66 +226,51 @@ parse_expr :: proc(p: ^Parser, prec: Precedence) -> ^ast.Node {
 	return left_expr
 }
 
-parse_ident :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Ident
-	node.token = p.curr_tok
-	node.ident_val = p.curr_tok.literal
-
-	return node
+parse_ident :: proc(p: ^Parser) -> ^ast.Expr {
+	ident := ast.new(ast.Ident, p.curr_tok, p.allocator)
+	ident.value = p.curr_tok.literal
+	return ident
 }
 
-parse_int :: proc(p: ^Parser) -> ^ast.Node {
+parse_integer_literal :: proc(p: ^Parser) -> ^ast.Expr {
 	val, ok := strconv.parse_i64(p.curr_tok.literal)
 	if !ok {
 		parser_error(p, "could not parse %s as integer", p.curr_tok.literal)
 		return {}
 	}
 
-	node := new(ast.Node, p.allocator)
-	node.kind = .Int_Lit
-	node.token = p.curr_tok
-	node.int_lit_val = val
-
-	return node
+	il := ast.new(ast.Integer_Literal, p.curr_tok, p.allocator)
+	il.value = val
+	return il
 }
 
-parse_string_literal :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .String_Lit
-	node.token = p.curr_tok
-	node.string_lit_val = p.curr_tok.literal
-
-	return node
+parse_string_literal :: proc(p: ^Parser) -> ^ast.Expr {
+	sl := ast.new(ast.String_Literal, p.curr_tok, p.allocator)
+	sl.value = p.curr_tok.literal
+	return sl
 }
 
-parse_array :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Array_Lit
-	node.token = p.curr_tok
-
+parse_array_literal :: proc(p: ^Parser) -> ^ast.Expr {
+	al := ast.new(ast.Array_Literal, p.curr_tok, p.allocator)
 	elements := parse_expr_list(p, .Right_Bracket)
-	node.array_lit_elems = elements[:]
-
-	return node
+	al.elements = elements[:]
+	return al
 }
 
-parse_hash_literal :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Hash_Lit
-	node.token = p.curr_tok
+parse_hash_literal :: proc(p: ^Parser) -> ^ast.Expr {
+	hl := ast.new(ast.Hash_Literal, p.curr_tok, p.allocator)
 
-	pairs := make(map[^ast.Node]ast.Node, p.allocator)
+	hl.pairs = make(type_of(hl.pairs), p.allocator)
 
 	for p.peek_tok.type != .Right_Brace {
 		next_token(p)
-		key := new_clone(parse_expr(p, .Lowest), p.allocator)
+		key := parse_expr(p, .Lowest)
 		if !expect_peek(p, .Colon) {
 			return {}
 		}
 		next_token(p)
 		val := parse_expr(p, .Lowest)
-		pairs[key] = val
+		hl.pairs[key] = val
 
 		if p.peek_tok.type != .Right_Brace && !expect_peek(p, .Comma) {
 			return {}
@@ -303,25 +279,24 @@ parse_hash_literal :: proc(p: ^Parser) -> ^ast.Node {
 	if !expect_peek(p, .Right_Brace) {
 		return {}
 	}
-	hash.pairs = pairs
 
-	return node
+	return hl
 }
 
-parse_expr_list :: proc(p: ^Parser, end: token.Token_Type) -> []ast.Node {
-	elems := make([dynamic]ast.Node, p.allocator)
+parse_expr_list :: proc(p: ^Parser, end: token.Token_Type) -> []^ast.Expr {
+	elems := make([dynamic]^ast.Expr, p.allocator)
 	if p.peek_tok.type == end {
 		next_token(p)
 		return elems[:]
 	}
 	next_token(p)
 	elem := parse_expr(p, .Lowest)
-	append(&elems, elem^)
+	append(&elems, elem)
 	for p.peek_tok.type == .Comma {
 		next_token(p)
 		next_token(p)
 		elem := parse_expr(p, .Lowest)
-		append(&elems, elem^)
+		append(&elems, elem)
 	}
 	if !expect_peek(p, end) {
 		return {}
@@ -329,48 +304,41 @@ parse_expr_list :: proc(p: ^Parser, end: token.Token_Type) -> []ast.Node {
 	return elems[:]
 }
 
-parse_prefix_expr :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Prefix_Expr
-	node.token = p.curr_tok
-	node.prefix_expr_op = p.curr_tok.literal
+parse_prefix_expr :: proc(p: ^Parser) -> ^ast.Expr {
+	pe := ast.new(ast.Prefix_Expr, p.curr_tok, p.allocator)
+	pe.op = p.curr_tok.literal
 
 	next_token(p)
-	node.prefix_expr_right = parse_expr(p, .Prefix)
+	pe.right = parse_expr(p, .Prefix)
 
-	return node
+	return pe
 }
 
-parse_infix_expr :: proc(p: ^Parser, left: ^ast.Node) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Infix_Expr
-	node.token = p.curr_tok
-	node.infix_expr_op = p.curr_tok.literal
-	node.infix_expr_left = left
+parse_infix_expr :: proc(p: ^Parser, left: ^ast.Expr) -> ^ast.Expr {
+	ie := ast.new(ast.Infix_Expr, p.curr_tok, p.allocator)
+	ie.op = p.curr_tok.literal
+	ie.left = left
 
 	precedence := curr_precedence(p)
 	next_token(p)
-	node.infix_expr_right = parse_expr(p, precedence)
+	ie.right = parse_expr(p, precedence)
 
-	return node
+	return ie
 }
 
-parse_boolean :: proc(p: ^Parser) -> ^ast.Node {
+parse_boolean :: proc(p: ^Parser) -> ^ast.Expr {
 	val, ok := strconv.parse_bool(p.curr_tok.literal)
 	if !ok {
 		parser_error(p, "could not parse %s as boolean", p.curr_tok.literal)
 		return {}
 	}
 
-	node := new(ast.Node, p.allocator)
-	node.kind = .Bool_Lit
-	node.token = p.curr_tok
-	node.bool_lit_val = val
-
-	return node
+	bl := ast.new(ast.Boolean, p.curr_tok, p.allocator)
+	bl.value = val
+	return bl
 }
 
-parse_grouped_expr :: proc(p: ^Parser) -> ^ast.Node {
+parse_grouped_expr :: proc(p: ^Parser) -> ^ast.Expr {
 	next_token(p)
 	inner := parse_expr(p, .Lowest)
 	if !expect_peek(p, .Right_Paren) {
@@ -380,73 +348,65 @@ parse_grouped_expr :: proc(p: ^Parser) -> ^ast.Node {
 	return inner
 }
 
-parse_if_expr :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .If_Expr
-	node.token = p.curr_tok
+parse_if_expr :: proc(p: ^Parser) -> ^ast.Expr {
+	ie := ast.new(ast.If_Expr, p.curr_tok, p.allocator)
 
 	if !expect_peek(p, .Left_Paren) {
 		return {}
 	}
 	next_token(p)
-	node.if_expr_cond = parse_expr(p, .Lowest)
+	ie.condition = parse_expr(p, .Lowest)
 	if !expect_peek(p, .Right_Paren) {
 		return {}
 	}
 	if !expect_peek(p, .Left_Brace) {
 		return {}
 	}
-	node.if_expr_then = parse_block_stmt(p)
+	ie.consequence = parse_block_stmt(p)
 
 	if p.peek_tok.type == .Else {
 		next_token(p)
 		if !expect_peek(p, .Left_Brace) {
 			return {}
 		}
-		node.if_expr_else = parse_block_stmt(p)
+		ie.alternative = parse_block_stmt(p)
 	}
 
-	return node
+	return ie
 }
 
-parse_function_literal :: proc(p: ^Parser) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Fn_Lit
-	node.token = p.curr_tok
+parse_function_literal :: proc(p: ^Parser) -> ^ast.Expr {
+	fl := ast.new(ast.Function_Literal, p.curr_tok, p.allocator)
 
 	if !expect_peek(p, .Left_Paren) {
 		return {}
 	}
-	node.fn_lit_params = parse_function_parameters(p)
+	fl.parameters = parse_function_parameters(p)
 	if !expect_peek(p, .Left_Brace) {
 		return {}
 	}
-	node.fn_lit_body = parse_block_stmt(p)
+	fl.body = parse_block_stmt(p)
 
-	return node
+	return fl
 }
 
-parse_function_parameters :: proc(p: ^Parser) -> []ast.Node {
-	idents := make([dynamic]ast.Ident, p.allocator)
+parse_function_parameters :: proc(p: ^Parser) -> []^ast.Ident {
+	idents := make([dynamic]^ast.Ident, p.allocator)
 	if p.peek_tok.type == .Right_Paren {
 		next_token(p)
-		return idents
+		return idents[:]
 	}
 	next_token(p)
-	ident := ast.Node {
-		kind      = .Ident,
-		token     = p.curr_tok,
-		ident_val = p.curr_tok.literal,
-	}
+
+	ident := ast.new(ast.Ident, p.curr_tok, p.allocator)
+	ident.value = p.curr_tok.literal
 	append(&idents, ident)
+
 	for p.peek_tok.type == .Comma {
 		next_token(p)
 		next_token(p)
-		ident := ast.Node {
-			kind      = .Ident,
-			token     = p.curr_tok,
-			ident_val = p.curr_tok.literal,
-		}
+		ident := ast.new(ast.Ident, p.curr_tok, p.allocator)
+		ident.value = p.curr_tok.literal
 		append(&idents, ident)
 	}
 	if !expect_peek(p, .Right_Paren) {
@@ -455,29 +415,24 @@ parse_function_parameters :: proc(p: ^Parser) -> []ast.Node {
 	return idents[:]
 }
 
-parse_call_expr :: proc(p: ^Parser, function: ^ast.Node) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Call_Expr
-	node.token = p.curr_tok
-	node.call_expr_fn = function
-	node.call_expr_fn = parse_expr_list(p, .Right_Paren)
-
-	return node
+parse_call_expr :: proc(p: ^Parser, function: ^ast.Expr) -> ^ast.Expr {
+	ce := ast.new(ast.Call_Expr, p.curr_tok, p.allocator)
+	ce.function = function
+	ce.arguments = parse_expr_list(p, .Right_Paren)
+	return ce
 }
 
-parser_index_expr :: proc(p: ^Parser, left: ^ast.Node) -> ^ast.Node {
-	node := new(ast.Node, p.allocator)
-	node.kind = .Index_Expr
-	node.token = p.curr_tok
-	node.index_expr_left = left
+parser_index_expr :: proc(p: ^Parser, left: ^ast.Expr) -> ^ast.Expr {
+	ie := ast.new(ast.Index_Expr, p.curr_tok)
+	ie.left = left
 
 	next_token(p)
-	node.index_expr_index = parse_expr(p, .Lowest)
+	ie.index = parse_expr(p, .Lowest)
 	if !expect_peek(p, .Right_Bracket) {
 		return {}
 	}
 
-	return node
+	return ie
 }
 
 expect_peek :: proc(p: ^Parser, type: token.Token_Type) -> bool {

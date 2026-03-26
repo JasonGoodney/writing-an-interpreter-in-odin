@@ -157,4 +157,3 @@ peek_token :: proc(l: ^Lexer) -> byte {
 	}
 	return l.input[l.read_pos]
 }
-

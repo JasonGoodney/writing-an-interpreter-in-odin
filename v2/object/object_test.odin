@@ -31,4 +31,3 @@ test_string_hash_key :: proc(t: ^testing.T) {
 		"strings with the different content have same hash keys",
 	)
 }
-
