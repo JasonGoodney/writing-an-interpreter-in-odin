@@ -7,8 +7,6 @@ import "../object"
 import "core:fmt"
 import "core:strings"
 
-new :: proc()
-
 eval :: proc(node: ^ast.Node, env: ^object.Env) -> object.Object {
 	switch n in node.derived {
 	case ^ast.Program:
