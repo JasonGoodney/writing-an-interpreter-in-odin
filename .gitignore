@@ -4,3 +4,4 @@ odin/
 waiig_code_1.3
 debug_build*
 *.bin
+*.sh
